@@ -6,6 +6,7 @@ from datetime import datetime
 class Room:
     """Сущность Комната"""
     id: str
+    name: str
     creator_id: str
     created_at: datetime
     is_active: bool = True

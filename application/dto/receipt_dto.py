@@ -11,7 +11,7 @@ class ParsedItemDTO(BaseModel):
 
 class ParsedReceiptDTO(BaseModel):
     """Формат ответа - сырой чек, найденный OCR"""
-    paid_at: str
+    paid_at: str = ""
     error: str | None = None
     items: List[ParsedItemDTO] = Field(default_factory=list)
     tip: Decimal = Decimal("0.00")

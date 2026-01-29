@@ -4,9 +4,9 @@ import lmstudio as lms
 
 SYSTEM_PROMPT = """
                  Ты - полезный агент, специалист по распознаванию чеков.
-                 Твоя работа заключается в извлечении из фотографии чека всех позиций в заказе с указанием их цены.
+                 Твоя основная задача заключается в извлечении из фотографии чека всех позиций в заказе с указанием их цены.
                  -Если при распознавании чека произошла ошибка,то ты ничего не придумываешь,
-                  записывай ошибку ее в поле error, а позицию пропускай, сли ошибок не было то оставляешь поле пустым.
+                  записывай ошибку ее в поле error, а позицию пропускай, если ошибок не было то оставляешь поле пустым.
                  """
 
 class LMStudioModel(OCRService):
@@ -27,7 +27,11 @@ class LMStudioModel(OCRService):
         модели, парсит ответ в Pydantic DTO."""
         image_handle = lms.prepare_image(image_path)
         chat = lms.Chat(initial_prompt=SYSTEM_PROMPT)
-        chat.add_user_message("Распознай все позиции из этого чека с их ценами", images=[image_handle])
+        prompt = """
+        Распознай все позиции из этого чека с их ценами,
+        определи дату заказа, сумму чаевых,
+        сервисный сбор (он так же может называться платой за стол или за обслуживание)"""
+        chat.add_user_message(prompt, images=[image_handle])
         try:
             prediction = self.model.respond(chat, response_format=ParsedReceiptDTO)
             return prediction.parsed

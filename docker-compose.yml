@@ -1,0 +1,27 @@
+version: "3.8"
+
+services:
+  db-service:
+    build: ./apps/db-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file:
+      - .env
+    ports:
+      - ${DB_SERVICE_PORT}:${DB_SERVICE_PORT}
+  postgres:
+    image: postgres:15
+    env_file:
+      - .env
+    volumes:
+      - ./db:/docker-entrypoint-initdb.d
+      - ./pg_data:/var/lib/postgresql/data
+    ports:
+      - ${DB_PORT}:${DB_PORT}
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+

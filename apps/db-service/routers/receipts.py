@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Receipt, ReceiptItem
+from models import Receipt, ReceiptItem, User
 from schemas import ReceiptCreate, ReceiptItemOut, ReceiptOut, ReceiptUpdate
 
 router = APIRouter(prefix="/receipts", tags=["receipts"])
@@ -10,6 +10,8 @@ router = APIRouter(prefix="/receipts", tags=["receipts"])
 
 @router.post("/", response_model=ReceiptOut, status_code=201)
 def create_receipt(payload: ReceiptCreate, db: Session = Depends(get_db)):
+    if not db.get(User, payload.creator_id):
+        raise HTTPException(status_code=404, detail="Creator user not found")
     receipt = Receipt(**payload.model_dump())
     db.add(receipt)
     db.commit()

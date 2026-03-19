@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Room, RoomParticipant, User
+from models import Receipt, Room, RoomParticipant, User
 from schemas import ParticipantOut, RoomCreate, RoomOut, RoomUpdate
 
 router = APIRouter(prefix="/rooms", tags=["rooms"])
@@ -12,6 +12,8 @@ router = APIRouter(prefix="/rooms", tags=["rooms"])
 def create_room(payload: RoomCreate, db: Session = Depends(get_db)):
     if not db.get(User, payload.creator_id):
         raise HTTPException(status_code=404, detail="Creator user not found")
+    if not db.get(Receipt, payload.receipt_id):
+        raise HTTPException(status_code=404, detail="Receipt not found")
     room = Room(**payload.model_dump())
     db.add(room)
     db.commit()

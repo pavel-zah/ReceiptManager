@@ -9,15 +9,16 @@ from pydantic import BaseModel, ConfigDict
 # ──────────────────────────────
 
 class UserCreate(BaseModel):
-    id: str
     username: str
+    user_public_name: str | None = None
 
 
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: str
+    id: int
     username: str
+    user_public_name: str | None
     registered_at: datetime
 
 
@@ -26,25 +27,27 @@ class UserOut(BaseModel):
 # ──────────────────────────────
 
 class ReceiptCreate(BaseModel):
-    id: str
     paid_at: datetime
     tip: Decimal = Decimal("0.00")
     service: Decimal = Decimal("0.00")
+    place_name: str | None = None
 
 
 class ReceiptUpdate(BaseModel):
     paid_at: datetime | None = None
     tip: Decimal | None = None
     service: Decimal | None = None
+    place_name: str | None = None
 
 
 class ReceiptOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: str
+    id: int
     paid_at: datetime
     tip: Decimal
     service: Decimal
+    place_name: str | None
 
 
 # ──────────────────────────────
@@ -52,25 +55,26 @@ class ReceiptOut(BaseModel):
 # ──────────────────────────────
 
 class RoomCreate(BaseModel):
-    id: str
     name: str
-    creator_id: str
-    receipt_id: str | None = None
+    public_key: str
+    creator_id: int
+    receipt_id: int | None = None
 
 
 class RoomUpdate(BaseModel):
     name: str | None = None
-    receipt_id: str | None = None
+    receipt_id: int | None = None
     is_active: bool | None = None
 
 
 class RoomOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: str
+    id: int
     name: str
-    creator_id: str
-    receipt_id: str | None
+    public_key: str
+    creator_id: int
+    receipt_id: int | None
     created_at: datetime
     is_active: bool
 
@@ -82,8 +86,8 @@ class RoomOut(BaseModel):
 class ParticipantOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    room_id: str
-    user_id: str
+    room_id: int
+    user_id: int
     joined_at: datetime | None
 
 
@@ -92,8 +96,7 @@ class ParticipantOut(BaseModel):
 # ──────────────────────────────
 
 class ReceiptItemCreate(BaseModel):
-    id: str
-    receipt_id: str
+    receipt_id: int
     name: str
     price: Decimal
     quantity: Decimal = Decimal("1.000")
@@ -108,8 +111,8 @@ class ReceiptItemUpdate(BaseModel):
 class ReceiptItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: str
-    receipt_id: str
+    id: int
+    receipt_id: int
     name: str
     price: Decimal
     quantity: Decimal
@@ -122,5 +125,5 @@ class ReceiptItemOut(BaseModel):
 class AssignmentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    item_id: str
-    user_id: str
+    item_id: int
+    user_id: int

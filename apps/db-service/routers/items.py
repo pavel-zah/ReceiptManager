@@ -59,14 +59,14 @@ def list_assignments(item_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/{item_id}/assignments/{user_id}", response_model=AssignmentOut, status_code=201)
-def assign_item(item_id: int, user_id: int, db: Session = Depends(get_db)):
+def assign_item(item_id: int, user_id: int, paid: str = "not paid", db: Session = Depends(get_db)):
     if not db.get(ReceiptItem, item_id):
         raise HTTPException(status_code=404, detail="Item not found")
     if not db.get(User, user_id):
         raise HTTPException(status_code=404, detail="User not found")
     if db.get(ItemAssignment, (item_id, user_id)):
         raise HTTPException(status_code=409, detail="Assignment already exists")
-    assignment = ItemAssignment(item_id=item_id, user_id=user_id)
+    assignment = ItemAssignment(item_id=item_id, user_id=user_id, paid=paid)
     db.add(assignment)
     db.commit()
     db.refresh(assignment)
@@ -80,3 +80,16 @@ def remove_assignment(item_id: int, user_id: int, db: Session = Depends(get_db))
         raise HTTPException(status_code=404, detail="Assignment not found")
     db.delete(assignment)
     db.commit()
+
+
+@router.patch("/{item_id}/assignments/{user_id}/paid", response_model=AssignmentOut)
+def update_assignment_paid_status(item_id: int, user_id: int, paid: str, db: Session = Depends(get_db)):
+    assignment = db.get(ItemAssignment, (item_id, user_id))
+    if not assignment:
+        raise HTTPException(status_code=404, detail="Assignment not found")
+    if paid not in ("not paid", "on review", "paid"):
+        raise HTTPException(status_code=400, detail="Invalid paid status")
+    assignment.paid = paid
+    db.commit()
+    db.refresh(assignment)
+    return assignment

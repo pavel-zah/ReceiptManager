@@ -27,10 +27,12 @@ class UserOut(BaseModel):
 # ──────────────────────────────
 
 class ReceiptCreate(BaseModel):
+    creator_id: int
     paid_at: datetime
     tip: Decimal = Decimal("0.00")
     service: Decimal = Decimal("0.00")
     place_name: str | None = None
+    status: str = "parsing"
 
 
 class ReceiptUpdate(BaseModel):
@@ -38,16 +40,20 @@ class ReceiptUpdate(BaseModel):
     tip: Decimal | None = None
     service: Decimal | None = None
     place_name: str | None = None
+    status: str | None = None
 
 
 class ReceiptOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: int
+    creator_id: int
     paid_at: datetime
     tip: Decimal
     service: Decimal
     place_name: str | None
+    status: str
+    created_at: datetime
 
 
 # ──────────────────────────────
@@ -58,12 +64,18 @@ class RoomCreate(BaseModel):
     name: str
     public_key: str
     creator_id: int
-    receipt_id: int | None = None
+    receipt_id: int
+    status: str = "active"
+    payment_details: str | None = None
+    receipt_comment: str | None = None
 
 
 class RoomUpdate(BaseModel):
     name: str | None = None
     receipt_id: int | None = None
+    status: str | None = None
+    payment_details: str | None = None
+    receipt_comment: str | None = None
     is_active: bool | None = None
 
 
@@ -74,7 +86,10 @@ class RoomOut(BaseModel):
     name: str
     public_key: str
     creator_id: int
-    receipt_id: int | None
+    receipt_id: int
+    status: str
+    payment_details: str | None
+    receipt_comment: str | None
     created_at: datetime
     is_active: bool
 
@@ -127,3 +142,4 @@ class AssignmentOut(BaseModel):
 
     item_id: int
     user_id: int
+    paid: str

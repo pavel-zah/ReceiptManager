@@ -10,8 +10,6 @@ router = APIRouter(prefix="/items", tags=["items"])
 
 @router.post("/", response_model=ReceiptItemOut, status_code=201)
 def create_item(payload: ReceiptItemCreate, db: Session = Depends(get_db)):
-    if db.get(ReceiptItem, payload.id):
-        raise HTTPException(status_code=409, detail="Item already exists")
     if not db.get(Receipt, payload.receipt_id):
         raise HTTPException(status_code=404, detail="Receipt not found")
     item = ReceiptItem(**payload.model_dump())
@@ -22,7 +20,7 @@ def create_item(payload: ReceiptItemCreate, db: Session = Depends(get_db)):
 
 
 @router.get("/{item_id}", response_model=ReceiptItemOut)
-def get_item(item_id: str, db: Session = Depends(get_db)):
+def get_item(item_id: int, db: Session = Depends(get_db)):
     item = db.get(ReceiptItem, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -30,7 +28,7 @@ def get_item(item_id: str, db: Session = Depends(get_db)):
 
 
 @router.patch("/{item_id}", response_model=ReceiptItemOut)
-def update_item(item_id: str, payload: ReceiptItemUpdate, db: Session = Depends(get_db)):
+def update_item(item_id: int, payload: ReceiptItemUpdate, db: Session = Depends(get_db)):
     item = db.get(ReceiptItem, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -42,7 +40,7 @@ def update_item(item_id: str, payload: ReceiptItemUpdate, db: Session = Depends(
 
 
 @router.delete("/{item_id}", status_code=204)
-def delete_item(item_id: str, db: Session = Depends(get_db)):
+def delete_item(item_id: int, db: Session = Depends(get_db)):
     item = db.get(ReceiptItem, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -53,7 +51,7 @@ def delete_item(item_id: str, db: Session = Depends(get_db)):
 # ── Assignments ───────────────────────────────────────────────────────────────
 
 @router.get("/{item_id}/assignments", response_model=list[AssignmentOut])
-def list_assignments(item_id: str, db: Session = Depends(get_db)):
+def list_assignments(item_id: int, db: Session = Depends(get_db)):
     item = db.get(ReceiptItem, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
@@ -61,7 +59,7 @@ def list_assignments(item_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/{item_id}/assignments/{user_id}", response_model=AssignmentOut, status_code=201)
-def assign_item(item_id: str, user_id: str, db: Session = Depends(get_db)):
+def assign_item(item_id: int, user_id: int, db: Session = Depends(get_db)):
     if not db.get(ReceiptItem, item_id):
         raise HTTPException(status_code=404, detail="Item not found")
     if not db.get(User, user_id):
@@ -76,7 +74,7 @@ def assign_item(item_id: str, user_id: str, db: Session = Depends(get_db)):
 
 
 @router.delete("/{item_id}/assignments/{user_id}", status_code=204)
-def remove_assignment(item_id: str, user_id: str, db: Session = Depends(get_db)):
+def remove_assignment(item_id: int, user_id: int, db: Session = Depends(get_db)):
     assignment = db.get(ItemAssignment, (item_id, user_id))
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")

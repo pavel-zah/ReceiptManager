@@ -1,12 +1,38 @@
 import os
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://postgres:postgres@localhost:5432/receiptmanager",
+DATABASE_HOST = os.getenv(
+    "DB_HOST",
+    "postgres",
 )
+
+DATABASE_PORT = os.getenv(
+    "DB_PORT",
+    "5432",
+)
+
+DATABASE_NAME = os.getenv(
+    "POSTGRES_DB",
+    "name",
+)
+
+DATABASE_USER = os.getenv(
+    "POSTGRES_USER",
+    "postgres",
+)
+
+DATABASE_PASSWORD = os.getenv(
+    "POSTGRES_PASSWORD",
+    "postgres",
+)
+
+DATABASE_URL = f"postgresql://{DATABASE_USER}:{DATABASE_PASSWORD}@{DATABASE_HOST}:{DATABASE_PORT}/{DATABASE_NAME}"
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

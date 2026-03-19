@@ -1,21 +1,24 @@
 CREATE TABLE users (
-    id VARCHAR(255) PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     username VARCHAR(255) NOT NULL,
+    user_public_name VARCHAR(255) NULL,
     registered_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE receipts (
-    id VARCHAR(255) PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     paid_at TIMESTAMP NOT NULL,
     tip DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
-    service DECIMAL(10, 2) NOT NULL DEFAULT 0.00
+    service DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
+    place_name VARCHAR(255) NULL
 );
 
 CREATE TABLE rooms (
-    id VARCHAR(255) PRIMARY KEY,
+    id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    creator_id VARCHAR(255) NOT NULL,
-    receipt_id VARCHAR(255) NULL, -- Nullable, так как в Python "str | None"
+    public_key VARCHAR(6) UNIQUE NOT NULL,
+    creator_id INTEGER NOT NULL,
+    receipt_id INTEGER NULL, -- Nullable, так как в Python "str | None"
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
 
@@ -33,9 +36,9 @@ CREATE TABLE rooms (
 );
 
 CREATE TABLE room_participants (
-    room_id VARCHAR(255) NOT NULL,
-    user_id VARCHAR(255) NOT NULL,
-    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, -- Полезно знать, когда добавился
+    room_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     PRIMARY KEY (room_id, user_id), -- Уникальная пара
 
@@ -53,8 +56,8 @@ CREATE TABLE room_participants (
 );
 
 CREATE TABLE receipt_items (
-    id VARCHAR(255) PRIMARY KEY,
-    receipt_id VARCHAR(255) NOT NULL,
+    id SERIAL PRIMARY KEY,
+    receipt_id INTEGER NOT NULL,
     name VARCHAR(255) NOT NULL,
     price DECIMAL(10, 2) NOT NULL,
     quantity DECIMAL(10, 3) NOT NULL DEFAULT 1.000, -- 3 знака, если вдруг вес (кг)
@@ -67,8 +70,8 @@ CREATE TABLE receipt_items (
 );
 
 CREATE TABLE item_assignments (
-    item_id VARCHAR(255) NOT NULL,
-    user_id VARCHAR(255) NOT NULL,
+    item_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
 
     PRIMARY KEY (item_id, user_id),
 

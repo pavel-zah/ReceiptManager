@@ -1,5 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
+from typing import List
 
 from pydantic import BaseModel, ConfigDict
 
@@ -28,7 +29,7 @@ class UserOut(BaseModel):
 
 class ReceiptCreate(BaseModel):
     creator_id: int
-    paid_at: datetime
+    paid_at: datetime | None = None
     tip: Decimal = Decimal("0.00")
     service: Decimal = Decimal("0.00")
     place_name: str | None = None
@@ -111,17 +112,14 @@ class ParticipantOut(BaseModel):
 # ──────────────────────────────
 
 class ReceiptItemCreate(BaseModel):
-    receipt_id: int
     name: str
     price: Decimal
     quantity: Decimal = Decimal("1.000")
-
 
 class ReceiptItemUpdate(BaseModel):
     name: str | None = None
     price: Decimal | None = None
     quantity: Decimal | None = None
-
 
 class ReceiptItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -131,7 +129,6 @@ class ReceiptItemOut(BaseModel):
     name: str
     price: Decimal
     quantity: Decimal
-
 
 # ──────────────────────────────
 # ItemAssignment

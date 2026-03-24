@@ -1,29 +1,56 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from typing import List
 
-from database import get_db
-from models import ItemAssignment, Receipt, ReceiptItem, User
-from schemas import AssignmentOut, ReceiptItemCreate, ReceiptItemOut, ReceiptItemUpdate
+from ..database import get_db
+from ..models import ItemAssignment, Receipt, ReceiptItem, User
+from ..schemas import AssignmentOut, ReceiptItemCreate, ReceiptItemOut, ReceiptItemUpdate
+from ..logger import get_logger
+
+logger = get_logger(__name__)
 
 router = APIRouter(prefix="/items", tags=["items"])
 
 
-@router.post("/", response_model=ReceiptItemOut, status_code=201)
-def create_item(payload: ReceiptItemCreate, db: Session = Depends(get_db)):
-    if not db.get(Receipt, payload.receipt_id):
+@router.post("/{receipt_id}", response_model=List[ReceiptItemOut], status_code=201)
+def create_item(
+        receipt_id: int,
+        payload: List[ReceiptItemCreate],
+        db: Session = Depends(get_db)
+):
+    if not db.get(Receipt, receipt_id):
+        logger.warning(f"Attempt to add items to nonexistent receipt_id: {receipt_id}")
         raise HTTPException(status_code=404, detail="Receipt not found")
-    item = ReceiptItem(**payload.model_dump())
-    db.add(item)
+
+    if not payload:
+        logger.info(f"Empty payload was received for receipt_id: {receipt_id}. Skipping creation.")
+        return []
+
+    items = [
+        ReceiptItem(
+            **item.model_dump(),
+            receipt_id=receipt_id
+        )
+        for item in payload
+    ]
+
+    db.add_all(items)
     db.commit()
-    db.refresh(item)
-    return item
+
+    for item in items: db.refresh(item)
+
+    logger.info(f"Successfully added {len(items)} to receipt_id: {receipt_id}")
+
+    return items
 
 
 @router.get("/{item_id}", response_model=ReceiptItemOut)
 def get_item(item_id: int, db: Session = Depends(get_db)):
     item = db.get(ReceiptItem, item_id)
     if not item:
+        logger.warning(f"Attempt to get nonexistent item with item_id: {item_id}")
         raise HTTPException(status_code=404, detail="Item not found")
+    logger.warning(f"Successfully get item with item_id: {item_id}")
     return item
 
 
@@ -31,11 +58,13 @@ def get_item(item_id: int, db: Session = Depends(get_db)):
 def update_item(item_id: int, payload: ReceiptItemUpdate, db: Session = Depends(get_db)):
     item = db.get(ReceiptItem, item_id)
     if not item:
+        logger.warning(f"Attempt to update nonexistent item with item_id: {item_id}")
         raise HTTPException(status_code=404, detail="Item not found")
     for field, value in payload.model_dump(exclude_none=True).items():
         setattr(item, field, value)
     db.commit()
     db.refresh(item)
+    logger.warning(f"Successfully updated item with item_id: {item_id}")
     return item
 
 
@@ -43,9 +72,11 @@ def update_item(item_id: int, payload: ReceiptItemUpdate, db: Session = Depends(
 def delete_item(item_id: int, db: Session = Depends(get_db)):
     item = db.get(ReceiptItem, item_id)
     if not item:
+        logger.warning(f"Attempt to delete nonexistent item with item_id: {item_id}")
         raise HTTPException(status_code=404, detail="Item not found")
     db.delete(item)
     db.commit()
+    logger.warning(f"Successfully deleted item with item_id: {item_id}")
 
 
 # ── Assignments ───────────────────────────────────────────────────────────────

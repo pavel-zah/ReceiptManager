@@ -1,11 +1,9 @@
 import os
-import logging
-
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
+from app.core.logger import get_logger
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
+
+logger = get_logger(__name__)
 
 DATABASE_HOST = os.getenv(
     "DB_HOST",

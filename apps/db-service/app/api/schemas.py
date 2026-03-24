@@ -1,13 +1,10 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import List
-
 from pydantic import BaseModel, ConfigDict
 
 
-# ──────────────────────────────
-# User
-# ──────────────────────────────
+
+""" User schemas """
 
 class UserCreate(BaseModel):
     username: str
@@ -23,9 +20,9 @@ class UserOut(BaseModel):
     registered_at: datetime
 
 
-# ──────────────────────────────
-# Receipt
-# ──────────────────────────────
+
+"""Receipt schemas"""
+
 
 class ReceiptCreate(BaseModel):
     creator_id: int
@@ -57,9 +54,7 @@ class ReceiptOut(BaseModel):
     created_at: datetime
 
 
-# ──────────────────────────────
-# Room
-# ──────────────────────────────
+"""Room schemas"""
 
 class RoomCreate(BaseModel):
     name: str
@@ -95,8 +90,7 @@ class RoomOut(BaseModel):
     is_active: bool
 
 
-# ──────────────────────────────
-# RoomParticipant
+"""RoomParticipant schema"""
 # ──────────────────────────────
 
 class ParticipantOut(BaseModel):
@@ -107,9 +101,8 @@ class ParticipantOut(BaseModel):
     joined_at: datetime | None
 
 
-# ──────────────────────────────
-# ReceiptItem
-# ──────────────────────────────
+
+"""ReceiptItem schema"""
 
 class ReceiptItemCreate(BaseModel):
     name: str
@@ -130,9 +123,8 @@ class ReceiptItemOut(BaseModel):
     price: Decimal
     quantity: Decimal
 
-# ──────────────────────────────
-# ItemAssignment
-# ──────────────────────────────
+
+"""ItemAssignment schema"""
 
 class AssignmentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)

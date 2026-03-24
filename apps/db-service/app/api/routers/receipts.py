@@ -1,9 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-
-from database import get_db
-from models import Receipt, ReceiptItem, User
-from schemas import ReceiptCreate, ReceiptItemOut, ReceiptOut, ReceiptUpdate
+from app.db.database import get_db
+from app.db.models import Receipt, User
+from app.api.schemas import ReceiptCreate, ReceiptItemOut, ReceiptOut, ReceiptUpdate
 
 router = APIRouter(prefix="/receipts", tags=["receipts"])
 

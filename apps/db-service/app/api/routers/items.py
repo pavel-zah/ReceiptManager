@@ -1,11 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
-
-from ..database import get_db
-from ..models import ItemAssignment, Receipt, ReceiptItem, User
-from ..schemas import AssignmentOut, ReceiptItemCreate, ReceiptItemOut, ReceiptItemUpdate
-from ..logger import get_logger
+from app.db.database import get_db
+from app.db.models import ItemAssignment, Receipt, ReceiptItem, User
+from app.api.schemas import AssignmentOut, ReceiptItemCreate, ReceiptItemOut, ReceiptItemUpdate
+from app.core.logger import get_logger
 
 logger = get_logger(__name__)
 

@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import List
 from app.db.database import get_db
 from app.db.models import ItemAssignment, Receipt, ReceiptItem, User
-from app.api.schemas import AssignmentOut, ReceiptItemCreate, ReceiptItemOut, ReceiptItemUpdate
+from app.api.schemas import AssignmentOut, ReceiptItemCreate, ReceiptItemOut, ReceiptItemsResponse, ReceiptItemUpdate
 from app.core.logger import get_logger
 
 logger = get_logger(__name__)
@@ -11,8 +11,8 @@ logger = get_logger(__name__)
 router = APIRouter(prefix="/items", tags=["items"])
 
 
-@router.post("/{receipt_id}", response_model=List[ReceiptItemOut], status_code=201)
-def create_item(
+@router.post("/{receipt_id}", response_model=ReceiptItemsResponse, status_code=201)
+def create_items(
         receipt_id: int,
         payload: List[ReceiptItemCreate],
         db: Session = Depends(get_db)
@@ -23,7 +23,7 @@ def create_item(
 
     if not payload:
         logger.info(f"Empty payload was received for receipt_id: {receipt_id}. Skipping creation.")
-        return []
+        return {"items": []}
 
     items = [
         ReceiptItem(
@@ -40,7 +40,7 @@ def create_item(
 
     logger.info(f"Successfully added {len(items)} to receipt_id: {receipt_id}")
 
-    return items
+    return {"items": items}
 
 
 @router.get("/{item_id}", response_model=ReceiptItemOut)

@@ -1,5 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
+from typing import List
 from pydantic import BaseModel, ConfigDict
 
 
@@ -123,6 +124,8 @@ class ReceiptItemOut(BaseModel):
     price: Decimal
     quantity: Decimal
 
+class ReceiptItemsResponse(BaseModel):
+    items: List[ReceiptItemOut]
 
 """ItemAssignment schema"""
 

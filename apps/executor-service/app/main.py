@@ -7,6 +7,7 @@ from app.clients.db_client import DBClient
 async def lifespan(app: FastAPI):
     app.state.db_client = DBClient()
     yield
+    await app.state.db_client.close()
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Executor service", version="1.0.0")

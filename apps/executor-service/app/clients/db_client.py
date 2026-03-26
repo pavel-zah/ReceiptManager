@@ -6,22 +6,37 @@
 
 
 import httpx
-from typing import Any
+from typing import Any, List
+from pydantic import TypeAdapter
 from app.core.config import settings
 from app.core.logger import get_logger
 from app.schemas.receipt_item import ReceiptItemCreate, ReceiptItemUpdate, ReceiptItemOut
 from app.schemas.receipt import ReceiptUpdate
 
 logger = get_logger(__name__)
+
+receipt_items_adapter = TypeAdapter(List[ReceiptItemCreate])
+
     
 class DBClient:
     """Клиент для взаимодействия с API БД"""
 
     def __init__(self, base_url: str | None = None):
         self.base_url = base_url if base_url else settings.database_api_url
-        logger.info(
-            f"Initialized client for DB API"
+
+        self.session = httpx.AsyncClient(
+            base_url=self.base_url,
+            timeout=10.0
         )
+
+        logger.info(f"Initialized client for DB API with base_url: {self.base_url}")
+
+    async def close(self):
+        """
+        Метод для закрытия соединения при остановке приложения
+        """
+        await self.session.aclose()
+        logger.info(f"DB API client session with base_url: {self.base_url} was closed")
 
     async def _request(
             self,
@@ -38,17 +53,16 @@ class DBClient:
         Returns:
             словарь - ответ от API
         """
-        url = f"{self.base_url}{path}"
         try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.request(method=method, url=url, **kwargs)
-                logger.info(f"Response to DB API, method: {method}")
-                response.raise_for_status()
+            response = await self.session.request(method=method, url=path, **kwargs)
+            logger.info(f"Response to DB API, method: {method}, path: {path}, status: {response.status_code}")
+            response.raise_for_status()
 
-                if response.status_code == 204 or not response.text:
-                    return None
+            if response.status_code == 204 or not response.text:
+                return None
 
-                return response.json()
+            return response.json()
+
         except httpx.HTTPStatusError as e:
             logger.error(f"DB API error: {e.response.status_code}: {e.response.text}")
             raise
@@ -59,23 +73,25 @@ class DBClient:
     """
     Методы для изменения информации о позициях
     """
-    async def add_item(
+    async def add_items(
             self,
-            payload: ReceiptItemCreate
+            item_id: int,
+            payload: List[ReceiptItemCreate]
     ) -> dict[str, Any]:
         """
-        Метод для добавления позиции
+        Метод для добавления позиций
         Args:
-            payload: информация о новой позиции
+            item_id: id позиции
+            payload: список с информацией о новых позициях
         Returns:
-            словарь, элементы которого: поля новой позиции
+            список, с информацией о добавленных позициях
         """
 
-        data = payload.model_dump(exclude_none=True)
+        data = receipt_items_adapter.dump_python(payload, exclude_none=True)
 
         return await self._request(
             "POST",
-            "/items",
+            f"/items/{item_id}",
             json=data,
         )
 

@@ -34,9 +34,10 @@ def create_items(
     ]
 
     db.add_all(items)
-    db.commit()
 
-    for item in items: db.refresh(item)
+    db.flush() # обновление данных в бд, генерация id
+
+    db.commit()
 
     logger.info(f"Successfully added {len(items)} to receipt_id: {receipt_id}")
 

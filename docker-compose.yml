@@ -24,4 +24,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
-
+  executor-service:
+    build: ./apps/executor-service
+    env_file:
+      - .env
+    ports:
+      - ${EXEC_SERVICE_PORT}:${EXEC_SERVICE_PORT}

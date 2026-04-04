@@ -1,12 +1,11 @@
 from functools import lru_cache
-from langgraph.prebuilt import create_react_agent
+from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.runnables import RunnableConfig
 
 from app.agent.llm import get_llm
-from app.agent.prompts import get_system_prompt, AgentPromptTemplate
-from app.agent.state import AgentState
-from app.agent.tools import get_all_tools
+from app.agent.prompts import RECEIPT_SYSTEM_PROMPT
+from app.agent.tools.manager import get_all_tools
 from app.core.config import settings
 from app.core.logger import get_logger
 
@@ -19,8 +18,7 @@ class AgentBuilder:
     def __init__(self):
         self.llm = get_llm()
         self.tools = get_all_tools()
-        self.system_prompt = get_system_prompt()
-        self.max_iterations = settings.agent_max_iterations
+        self.system_prompt = RECEIPT_SYSTEM_PROMPT
         self.checkpointer = None
 
     def with_llm(self, llm):
@@ -51,15 +49,15 @@ class AgentBuilder:
     def build(self):
         """Создаёт и возвращает готового агента"""
         logger.info(
-            f"Building agent with {len(self.tools)} tools, "
-            f"max_iterations={self.max_iterations}"
+            f"Building agent with {len(self.tools)} tools"
+            # f"with_max_iterations={self.max_iterations}"
         )
 
         # Создаём ReAct агента через LangGraph
-        agent = create_react_agent(
+        agent = create_agent(
             model=self.llm,
             tools=self.tools,
-            state_modifier=self.system_prompt,  # system message
+            system_prompt=self.system_prompt,  # system message
             checkpointer=self.checkpointer,
         )
 
@@ -97,9 +95,10 @@ class AgentExecutor:
         }
 
         # Конфигурация с session_id для checkpointer
-        run_config = config or {}
+        run_config = dict(config or {})
+        run_config.setdefault("configurable", {})
         if session_id:
-            run_config["configurable"] = {"thread_id": session_id}
+            run_config["configurable"]["thread_id"]=session_id
 
         try:
             # Выполняем агента
@@ -166,10 +165,8 @@ class AgentExecutor:
         }
 
 
-# ============================================
-# Singleton pattern для агента
-# ============================================
 
+# Singleton pattern для агента
 _agent_executor: AgentExecutor | None = None
 
 
@@ -199,39 +196,39 @@ def get_agent() -> AgentExecutor:
 # Специализированные агенты
 # ============================================
 
-def get_sql_agent() -> AgentExecutor:
-    """
-    Создаёт агента специализированного на SQL запросах.
-    """
-    from app.agent.tools.db_query import DBQueryTool
-    from app.agent.prompts import SQL_AGENT_PROMPT
+# def get_sql_agent() -> AgentExecutor:
+#     """
+#     Создаёт агента специализированного на SQL запросах.
+#     """
+#     from app.agent.tools.db_query import DBQueryTool
+#     from app.agent.prompts import SQL_AGENT_PROMPT
+#
+#     agent = (
+#         AgentBuilder()
+#         .with_tools([DBQueryTool()])
+#         .with_system_prompt(SQL_AGENT_PROMPT)
+#         .build()
+#     )
+#
+#     return AgentExecutor(agent)
+#
 
-    agent = (
-        AgentBuilder()
-        .with_tools([DBQueryTool()])
-        .with_system_prompt(SQL_AGENT_PROMPT)
-        .build()
-    )
-
-    return AgentExecutor(agent)
-
-
-def get_research_agent() -> AgentExecutor:
-    """
-    Создаёт агента для исследовательских задач с веб-поиском.
-    """
-    from app.agent.tools import WebSearchTool
-    from app.agent.tools import WebScraperTool
-
-    agent = (
-        AgentBuilder()
-        .with_tools([WebSearchTool(), WebScraperTool()])
-        .with_max_iterations(15)  # больше итераций для исследований
-        .build()
-    )
-
-    return AgentExecutor(agent)
-
+# def get_research_agent() -> AgentExecutor:
+#     """
+#     Создаёт агента для исследовательских задач с веб-поиском.
+#     """
+#     from app.agent.tools import WebSearchTool
+#     from app.agent.tools import WebScraperTool
+#
+#     agent = (
+#         AgentBuilder()
+#         .with_tools([WebSearchTool(), WebScraperTool()])
+#         .with_max_iterations(15)  # больше итераций для исследований
+#         .build()
+#     )
+#
+#     return AgentExecutor(agent)
+#
 
 # Вспомогательные функции
 

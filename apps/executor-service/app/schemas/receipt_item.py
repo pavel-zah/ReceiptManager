@@ -1,10 +1,9 @@
 from decimal import Decimal
-
+from typing import List
 from pydantic import BaseModel, ConfigDict
 
 
 class ReceiptItemCreate(BaseModel):
-    receipt_id: int
     name: str
     price: Decimal
     quantity: Decimal = Decimal("1.000")
@@ -25,3 +24,5 @@ class ReceiptItemOut(BaseModel):
     price: Decimal
     quantity: Decimal
 
+class ReceiptItemBatchOut(BaseModel):
+    items: List[ReceiptItemOut]

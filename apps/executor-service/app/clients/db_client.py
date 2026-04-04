@@ -7,15 +7,14 @@
 
 import httpx
 from typing import Any, List
-from pydantic import TypeAdapter
 from app.core.config import settings
 from app.core.logger import get_logger
-from app.schemas.receipt_item import ReceiptItemCreate, ReceiptItemUpdate, ReceiptItemOut
+from app.schemas.receipt_item import ReceiptItemCreate, ReceiptItemUpdate, ReceiptItemOut, ReceiptItemBatchOut
 from app.schemas.receipt import ReceiptUpdate
+from fastapi.encoders import jsonable_encoder
+
 
 logger = get_logger(__name__)
-
-receipt_items_adapter = TypeAdapter(List[ReceiptItemCreate])
 
     
 class DBClient:
@@ -75,60 +74,110 @@ class DBClient:
     """
     async def add_items(
             self,
-            item_id: int,
+            receipt_id: int,
             payload: List[ReceiptItemCreate]
-    ) -> dict[str, Any]:
+    ) -> ReceiptItemBatchOut:
         """
         Метод для добавления позиций
         Args:
-            item_id: id позиции
+            receipt_id: id чека для добавления новых позиций
             payload: список с информацией о новых позициях
         Returns:
-            список, с информацией о добавленных позициях
+            Валидированный объект, с информацией о добавленных позициях
         """
 
-        data = receipt_items_adapter.dump_python(payload, exclude_none=True)
+        data = jsonable_encoder(
+            [item.model_dump(exclude_none=True) for item in payload]
+        )
 
-        return await self._request(
+        response_data = await self._request(
             "POST",
-            f"/items/{item_id}",
+            f"/items/{receipt_id}",
             json=data,
         )
+
+        items_count = len(response_data.get("items", []))
+        logger.info(f"Added {items_count} items to receipt {receipt_id}")
+
+        return ReceiptItemBatchOut.model_validate(response_data)
+
 
     async def update_item(
             self,
             item_id: int,
             payload: ReceiptItemUpdate
-    ) -> dict[str, Any]:
+    ) -> ReceiptItemOut:
         """
         Метод для обновления позиции
         Args:
             item_id: id позиции
             payload: информация для обновления позиции
         Returns:
-            словарь, элементы которого: поля обновленной позиции
+            Валидированный объект с информацией об обновленной позиции
         """
-        data = payload.model_dump(exclude_unset=True)
-        return await self._request(
+        data = jsonable_encoder(
+            payload.model_dump(exclude_unset=True)
+        )
+
+        response_data = await self._request(
             "PATCH",
             f"/items/{item_id}",
             json=data
         )
 
+        return ReceiptItemOut.model_validate(response_data)
+
+
     async def get_item(
             self,
             item_id: int
-    ) -> dict[str, Any]:
+    ) -> ReceiptItemOut | None:
         """Метод для получения позиции
         Args:
             item_id: id позиции
         Returns:
-            словарь, элементы которого: поля найденной позиции
+            Валидированный объект с информацией об искомой позиции. None, если объект не найден
         """
-        return await self._request(
-            "GET",
-            f"/items/{item_id}",
-        )
+        try:
+            response_data =  await self._request(
+                "GET",
+                f"/items/{item_id}",
+            )
+
+            return ReceiptItemOut.model_validate(response_data)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                logger.info(f"Item with id {item_id} not found in DB.")
+                return None
+            raise
+
+
+    async def get_receipt_items(
+            self,
+            receipt_id: int
+    ) -> ReceiptItemBatchOut | None:
+        """Метод для получения позиции
+        Args:
+            receipt_id: id чека
+        Returns:
+            Валидированный объект с информацией о блюдах в чеке. None, если чек не найден
+        """
+        try:
+            response_data =  await self._request(
+                "GET",
+                f"/receipts/{receipt_id}/items",
+            )
+
+            items = response_data.get("items", {})
+            if items:
+                return None
+            else:
+                return ReceiptItemBatchOut.model_validate(items)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                logger.info(f"Receipt with id {receipt_id} not found in DB.")
+                return None
+            raise
 
     async def delete_item(
             self,

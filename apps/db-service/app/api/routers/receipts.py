@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.db.database import get_db
 from app.db.models import Receipt, User
-from app.api.schemas import ReceiptCreate, ReceiptItemOut, ReceiptOut, ReceiptUpdate
+from app.api.schemas import ReceiptCreate, ReceiptItemOut, ReceiptOut, ReceiptUpdate, ReceiptItemsResponse
 
 router = APIRouter(prefix="/receipts", tags=["receipts"])
 
@@ -47,9 +47,10 @@ def delete_receipt(receipt_id: int, db: Session = Depends(get_db)):
     db.commit()
 
 
-@router.get("/{receipt_id}/items", response_model=list[ReceiptItemOut])
-def list_receipt_items(receipt_id: int, db: Session = Depends(get_db)):
+@router.get("/{receipt_id}/items", response_model=ReceiptItemsResponse)
+def get_receipt_items(receipt_id: int, db: Session = Depends(get_db)):
     receipt = db.get(Receipt, receipt_id)
     if not receipt:
         raise HTTPException(status_code=404, detail="Receipt not found")
-    return receipt.items
+
+    return {"items": receipt.items}

@@ -28,6 +28,7 @@ class LLMFactory:
             model=settings.openrouter_model,
             api_key=settings.openrouter_api_key,
             base_url=settings.openrouter_base_url,
+            app_title=None,
             # timeout = settings.openrouter_timeout,
             streaming=False # пока False, надо разобраться с соединением
         )

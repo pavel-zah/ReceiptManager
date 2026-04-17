@@ -1,8 +1,3 @@
-CREATE TYPE receipt_status AS ENUM ('parsing', 'draft', 'assigned', 'archived');
-CREATE TYPE room_status AS ENUM ('active', 'completed', 'cancelled');
-CREATE TYPE paid_status AS ENUM ('not paid', 'on review', 'paid');
-
-
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     username VARCHAR(64) NOT NULL,
@@ -17,7 +12,7 @@ CREATE TABLE receipts (
     tip DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     service DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     place_name VARCHAR(255) NULL,
-    status receipt_status NOT NULL DEFAULT 'parsing',
+    status VARCHAR(50) NOT NULL DEFAULT 'parsing',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_receipts_creator
@@ -33,7 +28,7 @@ CREATE TABLE rooms (
     public_key VARCHAR(6) UNIQUE NOT NULL,
     creator_id INTEGER NOT NULL,
     receipt_id INTEGER NOT NULL,
-    status room_status NOT NULL DEFAULT 'active',
+    status VARCHAR(50) NOT NULL DEFAULT 'active',
     payment_details VARCHAR(256) NULL,
     receipt_comment VARCHAR(256) NULL,
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -89,7 +84,7 @@ CREATE TABLE receipt_items (
 CREATE TABLE item_assignments (
     item_id INTEGER NOT NULL,
     user_id INTEGER NOT NULL,
-    paid paid_status NOT NULL DEFAULT 'not paid',
+    paid VARCHAR(50) NOT NULL DEFAULT 'not paid',
 
     PRIMARY KEY (item_id, user_id),
 

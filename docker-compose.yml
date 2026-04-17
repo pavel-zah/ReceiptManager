@@ -1,6 +1,7 @@
 version: "3.8"
 
 services:
+
   db-service:
     build: ./apps/db-service
     depends_on:
@@ -10,6 +11,7 @@ services:
       - .env
     ports:
       - ${DB_SERVICE_PORT}:${DB_SERVICE_PORT}
+
   postgres:
     image: postgres:15
     env_file:
@@ -24,9 +26,31 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  postgres-checkpointer:
+    image: postgres:15
+    env_file:
+      - .env
+    environment:
+      - POSTGRES_USER=${LANGGRAPH_DB_USER}
+      - POSTGRES_PASSWORD=${LANGGRAPH_DB_PASSWORD}
+      - POSTGRES_DB=${LANGGRAPH_DB_NAME}
+    volumes:
+      - ./checkpointer_data:/var/lib/postgresql/data
+    ports:
+      - ${CHECKPOINTER_DB_PORT_EXTERNAL}:${CHECKPOINTER_DB_PORT_INTERNAL}
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${LANGGRAPH_DB_USER} -d ${LANGGRAPH_DB_NAME}" ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   executor-service:
     build: ./apps/executor-service
     env_file:
       - .env
     ports:
       - ${EXEC_SERVICE_PORT}:${EXEC_SERVICE_PORT}
+    depends_on:
+      postgres-checkpointer:
+        condition: service_healthy

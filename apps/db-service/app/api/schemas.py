@@ -1,13 +1,75 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import List
-from pydantic import BaseModel, ConfigDict
+from typing import List, Literal
+from pydantic import BaseModel, ConfigDict, field_validator
+
+
+"""Receipt schemas"""
+
+
+class ReceiptCreate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    creator_id: int
+    paid_at: datetime | None = None
+    tip: Decimal = Decimal("0.00")
+    service: Decimal = Decimal("0.00")
+    place_name: str | None = None
+    status: Literal["parsing", "draft", "assigned", "archived"] = "parsing"
+
+    @field_validator('status', mode='before')
+    @classmethod
+    def normalize_status(cls, v) -> str:
+        if isinstance(v, str):
+            normalized = v.lower()
+            if normalized not in ("parsing", "draft", "assigned", "archived"):
+                raise ValueError(f"Invalid status: {v}")
+            return normalized
+        raise ValueError(f"Invalid status type: {type(v)}")
+
+
+class ReceiptUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    paid_at: datetime | None = None
+    tip: Decimal | None = None
+    service: Decimal | None = None
+    place_name: str | None = None
+    status: Literal["parsing", "draft", "assigned", "archived"] | None = None
+
+    @field_validator('status', mode='before')
+    @classmethod
+    def normalize_status(cls, v) -> str | None:
+        if v is None:
+            return v
+        if isinstance(v, str):
+            normalized = v.lower()
+            if normalized not in ("parsing", "draft", "assigned", "archived"):
+                raise ValueError(f"Invalid status: {v}")
+            return normalized
+        raise ValueError(f"Invalid status type: {type(v)}")
 
 
 
-""" User schemas """
+class ReceiptOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    creator_id: int
+    paid_at: datetime | None
+    tip: Decimal
+    service: Decimal
+    place_name: str | None
+    status: str
+    created_at: datetime
+
+
+"""User schemas"""
+
 
 class UserCreate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, str_min_length=1)
+
     username: str
     user_public_name: str | None = None
 
@@ -21,59 +83,52 @@ class UserOut(BaseModel):
     registered_at: datetime
 
 
-
-"""Receipt schemas"""
-
-
-class ReceiptCreate(BaseModel):
-    creator_id: int
-    paid_at: datetime | None = None
-    tip: Decimal = Decimal("0.00")
-    service: Decimal = Decimal("0.00")
-    place_name: str | None = None
-    status: str = "parsing"
-
-
-class ReceiptUpdate(BaseModel):
-    paid_at: datetime | None = None
-    tip: Decimal | None = None
-    service: Decimal | None = None
-    place_name: str | None = None
-    status: str | None = None
-
-
-class ReceiptOut(BaseModel):
-    model_config = ConfigDict(from_attributes=True)
-
-    id: int
-    creator_id: int
-    paid_at: datetime
-    tip: Decimal
-    service: Decimal
-    place_name: str | None
-    status: str
-    created_at: datetime
-
-
 """Room schemas"""
 
+
 class RoomCreate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
     name: str
     public_key: str
     creator_id: int
     receipt_id: int
-    status: str = "active"
+    status: Literal["active", "completed", "cancelled"] = "active"
     payment_details: str | None = None
     receipt_comment: str | None = None
+
+    @field_validator('status', mode='before')
+    @classmethod
+    def normalize_status(cls, v) -> str:
+        if isinstance(v, str):
+            normalized = v.lower()
+            if normalized not in ("active", "completed", "cancelled"):
+                raise ValueError(f"Invalid status: {v}")
+            return normalized
+        raise ValueError(f"Invalid status type: {type(v)}")
 
 
 class RoomUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
     name: str | None = None
     receipt_id: int | None = None
-    status: str | None = None
+    status: Literal["active", "completed", "cancelled"] | None = None
     payment_details: str | None = None
     receipt_comment: str | None = None
     is_active: bool | None = None
+
+    @field_validator('status', mode='before')
+    @classmethod
+    def normalize_status(cls, v) -> str | None:
+        if v is None:
+            return v
+        if isinstance(v, str):
+            normalized = v.lower()
+            if normalized not in ("active", "completed", "cancelled"):
+                raise ValueError(f"Invalid status: {v}")
+            return normalized
+        raise ValueError(f"Invalid status type: {type(v)}")
 
 
 class RoomOut(BaseModel):
@@ -92,28 +147,46 @@ class RoomOut(BaseModel):
 
 
 """RoomParticipant schema"""
-# ──────────────────────────────
+
 
 class ParticipantOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     room_id: int
     user_id: int
-    joined_at: datetime | None
-
+    joined_at: datetime
 
 
 """ReceiptItem schema"""
 
+
 class ReceiptItemCreate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True, str_min_length=1)
+
     name: str
     price: Decimal
     quantity: Decimal = Decimal("1.000")
+
+    @field_validator('price', 'quantity')
+    @classmethod
+    def validate_positive(cls, v: Decimal) -> Decimal:
+        if v <= 0:
+            raise ValueError("Must be positive")
+        return v
+
 
 class ReceiptItemUpdate(BaseModel):
     name: str | None = None
     price: Decimal | None = None
     quantity: Decimal | None = None
+
+    @field_validator('price', 'quantity')
+    @classmethod
+    def validate_positive(cls, v: Decimal | None) -> Decimal | None:
+        if v is not None and v <= 0:
+            raise ValueError("Must be positive")
+        return v
+
 
 class ReceiptItemOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -124,10 +197,49 @@ class ReceiptItemOut(BaseModel):
     price: Decimal
     quantity: Decimal
 
+
 class ReceiptItemsResponse(BaseModel):
     items: List[ReceiptItemOut]
 
+
 """ItemAssignment schema"""
+
+
+class ItemAssignmentCreate(BaseModel):
+    """Схема для создания назначения"""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    item_id: int
+    user_id: int
+    paid: Literal["not paid", "on review", "paid"] = "not paid"
+
+    @field_validator('paid', mode='before')
+    @classmethod
+    def normalize_status(cls, v) -> str:
+        if isinstance(v, str):
+            normalized = v.lower()
+            if normalized not in ("not paid", "on review", "paid"):
+                raise ValueError(f"Invalid paid status: {v}")
+            return normalized
+        raise ValueError(f"Invalid paid status type: {type(v)}")
+
+
+class ItemAssignmentUpdate(BaseModel):
+    """Схема для обновления статуса оплаты"""
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    paid: Literal["not paid", "on review", "paid"]
+
+    @field_validator('paid', mode='before')
+    @classmethod
+    def normalize_status(cls, v) -> str:
+        if isinstance(v, str):
+            normalized = v.lower()
+            if normalized not in ("not paid", "on review", "paid"):
+                raise ValueError(f"Invalid paid status: {v}")
+            return normalized
+        raise ValueError(f"Invalid paid status type: {type(v)}")
+
 
 class AssignmentOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)

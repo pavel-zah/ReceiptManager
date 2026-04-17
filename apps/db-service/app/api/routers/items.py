@@ -34,9 +34,7 @@ def create_items(
     ]
 
     db.add_all(items)
-
-    db.flush() # обновление данных в бд, генерация id
-
+    db.flush()
     db.commit()
 
     logger.info(f"Successfully added {len(items)} to receipt_id: {receipt_id}")
@@ -97,7 +95,10 @@ def assign_item(item_id: int, user_id: int, paid: str = "not paid", db: Session 
         raise HTTPException(status_code=404, detail="User not found")
     if db.get(ItemAssignment, (item_id, user_id)):
         raise HTTPException(status_code=409, detail="Assignment already exists")
-    assignment = ItemAssignment(item_id=item_id, user_id=user_id, paid=paid)
+    normalized_paid = paid.lower()
+    if normalized_paid not in ("not paid", "on review", "paid"):
+        raise HTTPException(status_code=400, detail=f"Invalid paid status: {paid}")
+    assignment = ItemAssignment(item_id=item_id, user_id=user_id, paid=normalized_paid)
     db.add(assignment)
     db.commit()
     db.refresh(assignment)
@@ -118,9 +119,10 @@ def update_assignment_paid_status(item_id: int, user_id: int, paid: str, db: Ses
     assignment = db.get(ItemAssignment, (item_id, user_id))
     if not assignment:
         raise HTTPException(status_code=404, detail="Assignment not found")
-    if paid not in ("not paid", "on review", "paid"):
-        raise HTTPException(status_code=400, detail="Invalid paid status")
-    assignment.paid = paid
+    normalized_paid = paid.lower()
+    if normalized_paid not in ("not paid", "on review", "paid"):
+        raise HTTPException(status_code=400, detail=f"Invalid paid status: {paid}")
+    assignment.paid = normalized_paid
     db.commit()
     db.refresh(assignment)
     return assignment

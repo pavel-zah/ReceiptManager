@@ -1,4 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from urllib.parse import quote_plus
+from pydantic import computed_field
 from functools import lru_cache
 from typing import Optional
 from pathlib import Path
@@ -31,18 +33,40 @@ class Settings(BaseSettings):
     cors_allow_headers: list[str] = ["*"]
 
     # LLM (OpenRouter)
-    openrouter_api_key: Optional[str] = None
+    openrouter_api_key: str | None = None
 
-    openrouter_model: Optional[str] = "qwen/qwen3.5-35b-a3b"
+    openrouter_model: str | None = "qwen/qwen3.5-35b-a3b"
 
-    openrouter_base_url: Optional[str] = "https://openrouter.ai/api/v1"
+    openrouter_base_url: str | None = "https://openrouter.ai/api/v1"
 
     openrouter_temperature: float = 0.0
     openrouter_max_tokens: int = 4096
     openrouter_timeout: int = 30  # секунды
 
     # DATABASE API
-    database_api_url: Optional[str] = None
+    database_api_url: str | None = None
+
+    # DATABASE CHECKPOINTER
+    langgraph_db_name: str = "postgres"
+    langgraph_db_user: str = "postgres"
+    langgraph_db_password: str = ""
+    langgraph_db_host: str = "localhost"
+    langgraph_db_port_internal: int = 5432
+    langgraph_db_port_external: int = 5431
+
+    @computed_field
+    @property
+    def langgraph_db_url(self) -> str:
+        # экранирование пароля
+        pwd = quote_plus(self.langgraph_db_password) if self.langgraph_db_password else ""
+
+        return (
+            f"postgresql://"
+            f"{self.langgraph_db_user}:{pwd}"
+            f"@{self.langgraph_db_host}:{self.langgraph_db_port_internal}"
+            f"/{self.langgraph_db_name}"
+        )
+
 
     # LOGGING
     log_level: str = "INFO"  # DEBUG | INFO | WARNING | ERROR
@@ -54,8 +78,8 @@ class Settings(BaseSettings):
 
     # External API tools
     external_api_enabled: bool = True
-    external_api_url: Optional[str] = None
-    external_api_key: Optional[str] = None
+    external_api_url: str | None = None
+    external_api_key: str | None = None
 
     # Настройки Pydantic
     model_config = SettingsConfigDict(

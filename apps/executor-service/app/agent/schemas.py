@@ -1,10 +1,10 @@
 from pydantic import BaseModel, Field
 from typing import List
-from dataclasses import dataclass
+from typing_extensions import TypedDict, Annotated
+from dataclasses import dataclass, field
 from app.clients.db_client import DBClient
-from app.schemas.receipt_item import ReceiptItemCreate, ReceiptItemUpdate
+from app.schemas.receipt_item import ReceiptItemCreate, ReceiptItemUpdate, ReceiptItemBatchOut
 from decimal import Decimal
-from typing import Annotated
 import operator
 
 # ===============
@@ -75,18 +75,22 @@ class ReceiptItemBatchOutSchema(BaseModel):
 # Agent Context Schema
 # ====================
 
-@dataclass
-class AgentState:
+class AgentRoomState(TypedDict):
     """
     Контекст, который прокидывается в tools агента.
     """
-    db_client: DBClient
     messages: Annotated[list, operator.add]
-    id_mapping: dict
-    receipt_id: str | None = None
-    room_id: str | None = None
-    user_id: str | None = None
-    receipt_updated: bool = False
+    # id_mapping: dict
+    command: str
+    answer: str
+    params: dict | None
+    error: str | None
+    receipt_updated: bool
+    added_items: ReceiptItemBatchOut
+
+    # receipt_id: str | None = None
+    # room_id: str | None = None
+    # user_id: str | None = None
 
 # =====================
 # Agent Response Schema

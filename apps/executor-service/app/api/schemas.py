@@ -5,6 +5,7 @@ from pydantic import BaseModel, ConfigDict
 
 class ChatRequest(BaseModel):
     user_message: str
+    user_id: str
     receipt_id: str
 
 

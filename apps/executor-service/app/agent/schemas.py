@@ -51,6 +51,7 @@ class ReceiptItemBatchCreateSchema(BaseModel):
     Сущность с информацией о позициях для добавления в чек позициях
     """
     items: List[ReceiptItemCreateSchema] = Field(description="список позиций для добавления в чек")
+    error: str | None = Field(description="Поле с текстом об ошибке, в случае если не получилось распарсить данные")
 
 
 class ReceiptItemOutSchema(BaseModel):
@@ -80,13 +81,15 @@ class AgentRoomState(TypedDict):
     Контекст, который прокидывается в tools агента.
     """
     messages: Annotated[list, operator.add]
-    # id_mapping: dict
-    command: str
+    current_command: str
     answer: str
     params: dict | None
     error: str | None
     receipt_updated: bool
-    added_items: ReceiptItemBatchOut
+    execution_result: str
+    items_to_add: ReceiptItemBatchCreateSchema
+    added_items: ReceiptItemBatchOutSchema
+    receipt_items: ReceiptItemBatchOutSchema
 
     # receipt_id: str | None = None
     # room_id: str | None = None

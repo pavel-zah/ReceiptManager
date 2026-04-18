@@ -163,16 +163,17 @@ class DBClient:
             Валидированный объект с информацией о блюдах в чеке. None, если чек не найден
         """
         try:
-            response_data =  await self._request(
+            response_data = await self._request(
                 "GET",
                 f"/receipts/{receipt_id}/items",
             )
 
-            items = response_data.get("items", {})
-            if items:
-                return None
-            else:
-                return ReceiptItemBatchOut.model_validate(items)
+            # возвращаем пустую схему
+            if not response_data:
+                return ReceiptItemBatchOut(items=[])
+
+            return ReceiptItemBatchOut.model_validate(response_data)
+
         except httpx.HTTPStatusError as e:
             if e.response.status_code == 404:
                 logger.info(f"Receipt with id {receipt_id} not found in DB.")

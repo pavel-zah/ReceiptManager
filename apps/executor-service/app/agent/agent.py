@@ -2,10 +2,16 @@ from functools import lru_cache
 from langchain.agents import create_agent
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.runnables import RunnableConfig
+from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+from langgraph.graph.state import CompiledStateGraph
+from typing_extensions import TypedDict
+from typing import Callable
+
 
 from app.agent.llm import get_llm
 from app.agent.prompts import RECEIPT_SYSTEM_PROMPT
-from app.agent.tools.manager import get_all_tools
+from app.agent.schemas import AgentRoomState
+from app.agent.tools.manager import get_all_tools, get_receipt_tools
 from app.core.config import settings
 from app.core.logger import get_logger
 
@@ -19,6 +25,7 @@ class AgentBuilder:
         self.llm = get_llm()
         self.tools = get_all_tools()
         self.system_prompt = RECEIPT_SYSTEM_PROMPT
+        self.state_schema = None
         self.checkpointer = None
 
     def with_llm(self, llm):
@@ -26,7 +33,7 @@ class AgentBuilder:
         self.llm = llm
         return self
 
-    def with_tools(self, tools):
+    def with_tools(self, tools: list[Callable]):
         """Установить кастомный набор инструментов"""
         self.tools = tools
         return self
@@ -36,17 +43,22 @@ class AgentBuilder:
         self.system_prompt = prompt
         return self
 
+    def with_state_schema(self, state_schema: TypedDict):
+        """Установить кастомный state schema"""
+        self.state_schema  = state_schema
+        return self
+
     def with_max_iterations(self, max_iterations: int):
         """Установить максимальное количество итераций"""
         self.max_iterations = max_iterations
         return self
 
-    def with_memory(self, checkpointer):
+    def with_memory(self, checkpointer: AsyncPostgresSaver):
         """Добавить персистентную память (checkpointer)"""
         self.checkpointer = checkpointer
         return self
 
-    def build(self):
+    def build(self) -> CompiledStateGraph:
         """Создаёт и возвращает готового агента"""
         logger.info(
             f"Building agent with {len(self.tools)} tools"
@@ -58,6 +70,7 @@ class AgentBuilder:
             model=self.llm,
             tools=self.tools,
             system_prompt=self.system_prompt,  # system message
+            state_schema=self.state_schema,
             checkpointer=self.checkpointer,
         )
 
@@ -67,7 +80,7 @@ class AgentBuilder:
 class AgentExecutor:
     """Обёртка над агентом для удобного выполнения"""
 
-    def __init__(self, agent):
+    def __init__(self, agent: CompiledStateGraph):
         self.agent = agent
 
     async def ainvoke(
@@ -87,21 +100,22 @@ class AgentExecutor:
         Returns:
             Результат выполнения агента
         """
-        logger.info(f"Agent invoked with message: {message[:100]}...")
+        logger.info(f"Agent invoked with message: {message[:50]}...")
 
         # Формируем входные данные
         input_data = {
-            "messages": [HumanMessage(content=message)]
+            "messages": [HumanMessage(content=message),],
+            "user_id": config.get("configurable", {}).get("user_id"),
+            "receipt_id": config.get("configurable", {}).get("receipt_id"),
         }
-
         # Конфигурация с session_id для checkpointer
         run_config = dict(config or {})
         run_config.setdefault("configurable", {})
         if session_id:
             run_config["configurable"]["thread_id"]=session_id
-
+        print(input_data)
+        print(run_config)
         try:
-            # Выполняем агента
             result = await self.agent.ainvoke(input_data, config=run_config)
 
             logger.info(f"Agent completed successfully")
@@ -177,6 +191,23 @@ def build_default_agent() -> AgentExecutor:
     return AgentExecutor(agent)
 
 
+@lru_cache(maxsize=1)
+def build_receipt_agent(
+        checkpointer: AsyncPostgresSaver | None = None
+) -> AgentExecutor:
+    """Создаёт агента по умолчанию (singleton)"""
+    tools = get_receipt_tools()
+    prompt = RECEIPT_SYSTEM_PROMPT
+
+    agent = (AgentBuilder().
+             with_tools(tools).
+             with_system_prompt(prompt).
+             with_state_schema(AgentRoomState).
+             with_memory(checkpointer).
+             build())
+    return AgentExecutor(agent)
+
+
 def get_agent() -> AgentExecutor:
     """
     Возвращает singleton инстанс агента.
@@ -190,6 +221,24 @@ def get_agent() -> AgentExecutor:
         _agent_executor = build_default_agent()
 
     return _agent_executor
+
+
+_receipt_agent_executor: AgentExecutor | None = None
+
+
+def get_receipt_agent(checkpointer: AsyncPostgresSaver | None = None) -> AgentExecutor:
+    """
+    Возвращает singleton инстанс агента по управлению чеком.
+
+    Returns:
+        Готовый к использованию AgentExecutor
+    """
+    global _receipt_agent_executor
+
+    if _receipt_agent_executor is None:
+        _receipt_agent_executor = build_receipt_agent(checkpointer)
+
+    return _receipt_agent_executor
 
 
 # ============================================

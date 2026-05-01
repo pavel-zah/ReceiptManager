@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.clients.db_client import DBClient
 from app.agent.llm import get_llm
 from app.agent.agent import get_agent
+from app.agent.agent import get_receipt_agent
 from app.agent.graph import get_graph
 from app.core.logger import get_logger
 import uvicorn
@@ -26,6 +27,7 @@ async def lifespan(app: FastAPI):
         app.state.llm = get_llm()
         app.state.db_client = DBClient()
         app.state.agent = get_agent()
+        app.state.receipt_agent = get_receipt_agent(checkpointer)
         app.state.graph = await get_graph(checkpointer)
         yield
         await app.state.db_client.close()
@@ -38,7 +40,7 @@ def create_app() -> FastAPI:
     app.include_router(router.router)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # В продакшене лучше указать конкретные домены
+        allow_origins=["*"],  # лучше указать конкретные домены
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

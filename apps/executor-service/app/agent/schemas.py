@@ -95,6 +95,20 @@ class AgentRoomState(TypedDict):
     # room_id: str | None = None
     # user_id: str | None = None
 
+
+
+class AgentReceiptState(TypedDict):
+    messages: Annotated[list, operator.add]
+
+    user_id: str
+
+    receipt_id: str | None
+    id_map: dict[int, str]
+
+    receipt_updated: bool
+    error: str | None
+
+
 # =====================
 # Agent Response Schema
 # =====================

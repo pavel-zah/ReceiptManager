@@ -18,6 +18,12 @@ def get_current_agent(request: Request):
 
 Agent = Annotated[AgentExecutor, Depends(get_current_agent)]
 
+
+def get_receipt_agent(request: Request):
+    return request.app.state.receipt_agent
+
+ReceiptAgent = Annotated[AgentExecutor, Depends(get_receipt_agent)]
+
 def get_current_graph(request: Request):
     return request.app.state.graph
 

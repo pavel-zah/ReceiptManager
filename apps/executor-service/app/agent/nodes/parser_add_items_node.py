@@ -1,7 +1,7 @@
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.runnables import RunnableConfig
 from app.agent.schemas import AgentRoomState
-from app.agent.tools.receipt_config_tools import addItems
+from app.agent.tools.receipt_config_tools import add_items
 from app.agent.schemas import ReceiptItemBatchCreateSchema
 
 

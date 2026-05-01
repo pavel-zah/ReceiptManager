@@ -1,37 +1,75 @@
 from app.core.config import get_settings
 from app.core.logger import get_logger
-from langchain.tools import tool
+from langchain.tools import tool, ToolRuntime
+from langchain.messages import ToolMessage
 from langchain_core.runnables import RunnableConfig
-from app.agent.schemas import ReceiptItemBatchCreateSchema, ReceiptItemUpdateSchema, ReceiptItemOutSchema
+from app.agent.schemas import ReceiptItemBatchCreateSchema, ReceiptItemUpdateSchema, ReceiptItemOutSchema, AgentReceiptState
 from app.schemas.receipt_item import ReceiptItemUpdate
+
+from langgraph.types import Command
+
 import httpx
 
 logger = get_logger(__name__)
 
 
 @tool
-async def addItems(receipt_items_object: ReceiptItemBatchCreateSchema, config: RunnableConfig) -> dict[str, list | str] | str:
+async def add_items(
+        receipt_items_object: ReceiptItemBatchCreateSchema,
+        runtime: ToolRuntime[None, AgentReceiptState]
+) -> Command:
     """
-    Добавление позиций чека в базу данных.
-    Args:
-        receipt_items_object: список позиций для добавления в чек
-    Returns:
-        Словарь с полем items - список добавленных позиций в виде словарей,
-        либо строка с сообщением об ошибке/отсутствии данных и командой для выполнения.
-    """
-    configurable = config.get("configurable", {})
-    metadata = config.get("metadata", {})
+    Добавляет новые позиции в чек.
 
+    receipt_items_object: список позиций для добавления в чек
+
+
+    Возвращает:
+    Словарь с полем items - список добавленных позиций в виде словарей,
+    либо строка с сообщением об ошибке/отсутствии данных
+    и командой для последующего выполнения.
+    """
+
+    config = runtime.config
+
+    configurable = config.get("configurable", {})
     db_client = configurable.get("db_client")
-    receipt_id = metadata.get("receipt_id")
+
+    receipt_id = configurable.get("receipt_id")
 
     if not db_client:
         logger.error("Error: unable to connect to DB: db_client not found in config configurable.")
-        return "Системная ошибка: нет подключения к БД. Сообщи пользователю об ошибке."
+
+        error = "unable to connect to DB: db_client not found in config configurable"
+        error_message = "Системная ошибка: нет подключения к БД. Сообщи пользователю об ошибке."
+
+        return Command(
+            update={
+                "error": error,
+                "messages": [
+                    ToolMessage(
+                    content=error_message,
+                    tool_call_id=runtime.tool_call_id),
+                ]
+            }
+        )
 
     if not receipt_id:
         logger.error("Error: unable add items: receipt_id not found in config metadata.")
-        return "Ошибка: отсутствует ID чека. Убедись, что чек был создан до добавления позиций."
+
+        error = "unable add items: receipt_id not found in config metadata"
+        error_message = "Ошибка: отсутствует ID чека. Убедись, что чек был создан до добавления позиций."
+
+        return Command(
+            update={
+                "error": error,
+                "messages": [
+                    ToolMessage(
+                    content=error_message,
+                    tool_call_id=runtime.tool_call_id),
+                ]
+            }
+        )
 
     try:
 
@@ -45,226 +83,331 @@ async def addItems(receipt_items_object: ReceiptItemBatchCreateSchema, config: R
         error_details = e.response.text if e.response else str(e)
         logger.error(f"HTTP {status_code}: failed to add items to receipt {receipt_id}", exc_info=True)
 
-        return f"""
+        error = f"HTTP {status_code}"
+        error_message = f"""
             Ошибка API при добавлении позиций в чек.
             Код ответа: {status_code}.
             Детали: {error_details}.
             Исправь данные и попробуй снова."""
 
+        return Command(
+            update={
+                "error": error,
+                "messages": [
+                    ToolMessage(
+                    content=error_message,
+                    tool_call_id=runtime.tool_call_id),
+                ]
+            }
+        )
+
     except Exception as e:
 
         logger.error(f"Unexpected error while adding items to receipt {receipt_id}", exc_info=True)
-        return f"Произошла непредвиденная ошибка при добавлении позиций: {str(e)}."
 
+        error = "unexpected error"
+        error_message = f"Произошла непредвиденная ошибка при добавлении позиций: {str(e)}."
+
+        return Command(
+            update={
+                "error": error,
+                "messages": [
+                    ToolMessage(
+                    content=error_message,
+                    tool_call_id=runtime.tool_call_id),
+                ]
+            }
+        )
 
     if item_count := len(response.items):
-
-        if "app_state" not in configurable:
-            configurable["app_state"] = {}
-
-        configurable["app_state"]["receipt_updated"] = True
 
         logger.info(f"Operation successful: {item_count} items were added to receipt with id {receipt_id}")
 
-        return response.model_dump()
+        response_message = response.model_dump()
+
+        return Command(
+            update={
+                "error": None,
+                "receipt_updated": True,
+                "messages": [
+                    ToolMessage(
+                    content=response_message,
+                    tool_call_id=runtime.tool_call_id),
+                ]
+            }
+        )
 
     logger.warning(f"Error: empty payload for receipt {receipt_id}")
 
-    return "Ошибка. Не было добавлено ни одной позиции. Проверь переданные данные"
+    return Command(
+        update={
+            "error": "no items were added",
+            "messages": [ToolMessage(
+                content="Ошибка. Не было добавлено ни одной позиции. Проверь переданные данные",
+                tool_call_id=runtime.tool_call_id),
+            ]
+        }
+    )
 
 
 @tool
-async def getReceiptItems(config: RunnableConfig) -> dict[str, list | str] | str:
+async def get_receipt_items(
+    runtime: ToolRuntime[None, AgentReceiptState],
+) -> Command:
     """
-    Получение всех позиций в чеке.
-    Args:
-        None
-    Returns:
-        Словарь с полем items - список добавленных позиций в виде словарей,
-        либо строка с сообщением об ошибке/отсутствии данных и командой для выполнения.
+        Получает информацию о всех позициях в текущем чеке.
+
+        Используется для получения актуальной информации
+        о всех позициях в текущем чеке, включая актуальные номера позиций.
     """
+    config = runtime.config
 
     configurable = config.get("configurable", {})
-    metadata = config.get("metadata", {})
 
     db_client = configurable.get("db_client")
-    receipt_id = metadata.get("receipt_id")
+    receipt_id = configurable.get("receipt_id")
+
+    print("STATE:", runtime.state)
+    print("CONFIG:", runtime.config)
 
     if not db_client:
-        logger.error("Error: unable to connect to DB: db_client not found in config configurable.")
-        return "Системная ошибка: нет подключения к БД. Сообщи пользователю об ошибке."
+        return Command(update={
+            "error": "no_db_connection",
+            "messages": [
+                ToolMessage(
+                    content="Системная ошибка: нет подключения к БД.",
+                    tool_call_id=runtime.tool_call_id,
+                )
+            ],
+        })
 
     if not receipt_id:
-        logger.error("Error: unable to get receipt items: receipt_id not found in config metadata.")
-        return "Ошибка: отсутствует ID чека. Убедись, что чек был создан до обращения к нему."
+        return Command(update={
+            "error": "no_receipt_id",
+            "messages": [
+                ToolMessage(
+                    content="Ошибка: отсутствует ID чека.",
+                    tool_call_id=runtime.tool_call_id,
+                )
+            ],
+        })
 
     try:
-
         response = await db_client.get_receipt_items(receipt_id)
 
     except httpx.HTTPStatusError as e:
-
-        status_code = e.response.status_code if e.response else "Unknown"
-        error_details = e.response.text if e.response else str(e)
-        logger.error(f"HTTP {status_code}: failed to get items for receipt {receipt_id}", exc_info=True)
-
-        return f"""
-            Ошибка API получении позиций в чеке.
-            Код ответа: {status_code}.
-            Детали: {error_details}.
-            Сообщи пользователю об ошибке."""
+        return Command(update={
+            "error": f"http_{e.response.status_code if e.response else 'unknown'}",
+            "messages": [
+                ToolMessage(
+                    content="Ошибка API при получении позиций чека.",
+                    tool_call_id=runtime.tool_call_id,
+                )
+            ],
+        })
 
     except Exception as e:
+        return Command(update={
+            "error": "unexpected_error",
+            "messages": [
+                ToolMessage(
+                    content=f"Непредвиденная ошибка: {str(e)}",
+                    tool_call_id=runtime.tool_call_id,
+                )
+            ],
+        })
 
-        logger.error(f"Unexpected error while adding items to receipt {receipt_id}", exc_info=True)
-        return f"Произошла непредвиденная ошибка при добавлении позиций: {str(e)}."
+    if not response.items:
+        return Command(update={
+            "error": None,
+            "id_map": {},
+            "messages": [
+                ToolMessage(
+                    content="В чеке отсутствуют позиции.",
+                    tool_call_id=runtime.tool_call_id,
+                )
+            ],
+        })
 
-    if item_count := len(response.items):
+    id_map = {}
+    items_data = []
 
-        logger.info(f"Operation successful: {item_count} items were fetched from receipt {receipt_id}")
+    for i, item in enumerate(response.items, start=1):
+        id_map[i] = item.id
+        item_dict = item.model_dump()
+        item_dict["id"] = i
+        items_data.append(item_dict)
 
-        id_mapping = {}
-        items_data = []
-
-        for i, item in enumerate(response.items, start=1):
-
-            id_mapping[i] = item.id
-
-            item_dict = item.model_dump()
-            item_dict["id"] = i
-            items_data.append(item_dict)
-
-        config["configurable"]["app_state"]["id_mapping"] = id_mapping
-
-        return {"items": items_data}
-
-    logger.info(f"Empty items list for receipt {receipt_id}")
-
-    return "В чеке отсутствуют позиции"
-
+    return Command(update={
+        "error": None,
+        "id_map": id_map,
+        "messages": [
+            ToolMessage(
+                content=str({"items": items_data}),
+                tool_call_id=runtime.tool_call_id,
+            )
+        ],
+    })
 
 @tool
-async def get_item(item_display_id: int, config: RunnableConfig) -> dict[str, int | str | float] | str:
+async def get_item(
+    item_display_id: int,
+    runtime: ToolRuntime[None, AgentReceiptState],
+) -> Command:
     """
-    Получение информации о позиции по ее id.
-    Args:
-        item_display_id: id позиции в чеке, положительное целое число. Используй ID,
-         который был получен из последнего вызова getReceiptItems
-    Returns:
-        Словарь с информацией о позиции,
-        либо строка с сообщением об ошибке/отсутствии данных и командой для выполнения.
+        Получает информацию о позиции в текущем чеке по ее номеру.
+
+        Используется для проверки соответствия позиции и ее отображаемого id.
+        Если необходимо удалить или изменить объект, то необходимо проверить
+        соответствует ли id объекта самому объекту.
+        При несоответствии необходимо вызывать get_receipt_items и после повторить попытку.
+
+        Используй только если ранее вызывал get_receipt_items.
+
+        item_display_id — это отображаемый ID (номер в списке),
+        а не реальный ID из базы данных.
     """
+
+    config = runtime.config
+
     configurable = config.get("configurable", {})
 
-    app_state = configurable.get("app_state", {})
-
     db_client = configurable.get("db_client")
+
+    id_map = runtime.state.get("id_map", {})
+
     if not db_client:
-        logger.error("Error: unable to connect to DB: db_client not found in config configurable.")
-        return "Системная ошибка: нет подключения к БД. Сообщи пользователю об ошибке."
+        return Command(update={
+            "error": "no_db_connection",
+            "messages": [
+                ToolMessage(
+                    content="Системная ошибка: нет подключения к БД.",
+                    tool_call_id=runtime.tool_call_id,
+                )
+            ],
+        })
 
-    id_mapping = app_state.get("id_mapping")
-    if not id_mapping:
-        return "Ошибка по получении позиции по ее id, сначала получи список всех позиций в чеке"
-
-    item_real_id = id_mapping.get(item_display_id)
+    item_real_id = id_map.get(item_display_id)
     if not item_real_id:
-        return ("Ошибка по получении позиции по ее id,"
-                " попробуй получить список всех позиций в чеке и повторить попытку на основе новых данных")
+        return Command(update={
+            "error": "invalid_display_id",
+            "messages": [
+                ToolMessage(
+                    content="Сначала получи список позиций через get_receipt_items.",
+                    tool_call_id=runtime.tool_call_id,
+                )
+            ],
+        })
 
     try:
         response = await db_client.get_item(item_real_id)
 
-    except httpx.HTTPStatusError as e:
-
-        status_code = e.response.status_code if e.response else "Unknown"
-        error_details = e.response.text if e.response else str(e)
-        logger.error(f"HTTP {status_code}: failed to get item by id {item_real_id}", exc_info=True)
-
-        return f"""
-            Ошибка API получении позиции.
-            Код ответа: {status_code}.
-            Детали: {error_details}.
-            Сообщи пользователю об ошибке."""
-
     except Exception as e:
+        return Command(update={
+            "error": "get_item_failed",
+            "messages": [
+                ToolMessage(
+                    content=f"Ошибка при получении позиции: {str(e)}",
+                    tool_call_id=runtime.tool_call_id,
+                )
+            ],
+        })
 
-        logger.error("Unexpected error while getting item by id %s", item_real_id, exc_info=True)
-        return f"Произошла непредвиденная ошибка при получении позиции: {str(e)}."
+    result = response.model_dump()
+    result["id"] = item_display_id
 
-    if response:
-
-        logger.info("Operation successful: item with id %s was fetched", item_real_id)
-
-        response_dict = response.model_dump()
-        response_dict["id"] = item_display_id
-        return response_dict
-
-    return f"Элемент с таким id не был найден, проверь корректность введенных данных"
-
-
-#TODO lazy formating in logger
+    return Command(update={
+        "error": None,
+        "messages": [
+            ToolMessage(
+                content=str(result),
+                tool_call_id=runtime.tool_call_id,
+            )
+        ],
+    })
 
 
 @tool
 async def update_item(
-        item_display_id,
-        item_info: ReceiptItemUpdateSchema,
-        config: RunnableConfig
-) -> dict[str, int | str | float] | str:
+    item_display_id: int,
+    item_info: ReceiptItemUpdateSchema,
+    runtime: ToolRuntime[None, AgentReceiptState],
+) -> Command:
     """
-    Обновление информации о позиции по ее id.
-    Args:
-        item_display_id: id позиции в чеке, положительное целое число. Используй ID,
-         который был получен из последнего вызова getReceiptItems
-        item_info: объект с полями для обновления.
-    Returns:
-        Словарь с информацией об обновленной позиции,
-        либо строка с сообщением об ошибке/отсутствии данных и командой для выполнения.
+        Обновляет позицию в текущем чеке.
+
+        Используй только после вызова get_receipt_items.
+        item_display_id — это отображаемый ID (номер в списке),
+        а не реальный ID из базы данных.
+
+        item_info — объект с полями для обновления:
+        - name: новое название
+        - price: новая цена
+        - quantity: новое количество
     """
+
+    config = runtime.config
+
     configurable = config.get("configurable", {})
 
-    app_state = configurable.get("app_state", {})
-
     db_client = configurable.get("db_client")
+    id_map = runtime.state.get("id_map", {})
+
     if not db_client:
-        logger.error("Error: unable to connect to DB: db_client not found in config configurable.")
-        return "Системная ошибка: нет подключения к БД. Сообщи пользователю об ошибке."
+        return Command(update={
+            "error": "no_db_connection",
+            "messages": [
+                ToolMessage(
+                    content="Системная ошибка: нет подключения к БД.",
+                    tool_call_id=runtime.tool_call_id,
+                )
+            ],
+        })
 
-    id_mapping = app_state.get("id_mapping")
-    if not id_mapping:
-        return "Ошибка по обновлении позиции, сначала получи список всех позиций в чеке"
-
-    item_real_id = id_mapping.get(item_display_id)
+    item_real_id = id_map.get(item_display_id)
     if not item_real_id:
-        return ("Ошибка по обновлении позиции,"
-                " попробуй получить список всех позиций в чеке и повторить попытку на основе новых данных")
+        return Command(update={
+            "error": "invalid_display_id",
+            "messages": [
+                ToolMessage(
+                    content="Сначала получи список позиций через get_receipt_items.",
+                    tool_call_id=runtime.tool_call_id,
+                )
+            ],
+        })
 
     try:
-        response = await db_client.update_item(item_real_id, item_info.to_db_update())
-
-    except httpx.HTTPStatusError as e:
-
-        status_code = e.response.status_code if e.response else "Unknown"
-        error_details = e.response.text if e.response else str(e)
-        logger.error(f"HTTP {status_code}: failed to update item {item_real_id}", exc_info=True)
-
-        return f"""
-            Ошибка API обновлении позиции.
-            Код ответа: {status_code}.
-            Детали: {error_details}.
-            Сообщи пользователю об ошибке."""
+        response = await db_client.update_item(
+            item_real_id,
+            item_info.to_db_update()
+        )
 
     except Exception as e:
+        return Command(update={
+            "error": "update_failed",
+            "messages": [
+                ToolMessage(
+                    content=f"Ошибка при обновлении позиции: {str(e)}",
+                    tool_call_id=runtime.tool_call_id,
+                )
+            ],
+        })
 
-        logger.error("Unexpected error while updating item by id %s", item_real_id, exc_info=True)
-        return f"Произошла непредвиденная ошибка при обновлении позиции: {str(e)}."
-
-
-    return ReceiptItemOutSchema.model_validate({
+    result = ReceiptItemOutSchema.model_validate({
         **response.model_dump(),
         "id": item_display_id
     }).model_dump()
+
+    return Command(update={
+        "error": None,
+        "receipt_updated": True,
+        "messages": [
+            ToolMessage(
+                content=str(result),
+                tool_call_id=runtime.tool_call_id,
+            )
+        ],
+    })
 
 # @tool
 # async def delete_item(???, config: RunnableConfig) -> str:

@@ -113,8 +113,6 @@ class AgentExecutor:
         run_config.setdefault("configurable", {})
         if session_id:
             run_config["configurable"]["thread_id"]=session_id
-        print(input_data)
-        print(run_config)
         try:
             result = await self.agent.ainvoke(input_data, config=run_config)
 
@@ -173,6 +171,7 @@ class AgentExecutor:
 
         return {
             "answer": final_answer,
+            "receipt_updated": result.get("receipt_updated", False),
             "tools_used": [tc["name"] for tc in tool_calls],
             "tool_calls": tool_calls,
             "message_count": len(messages),

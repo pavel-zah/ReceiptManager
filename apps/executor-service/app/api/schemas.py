@@ -41,14 +41,10 @@ class UserOut(BaseModel):
 class ReceiptCreate(BaseModel):
     id: str
     paid_at: datetime
-    tip: Decimal = Decimal("0.00")
-    service: Decimal = Decimal("0.00")
 
 
 class ReceiptUpdate(BaseModel):
     paid_at: datetime | None = None
-    tip: Decimal | None = None
-    service: Decimal | None = None
 
 
 class ReceiptOut(BaseModel):
@@ -56,8 +52,6 @@ class ReceiptOut(BaseModel):
 
     id: str
     paid_at: datetime
-    tip: Decimal
-    service: Decimal
 
 
 # ──────────────────────────────

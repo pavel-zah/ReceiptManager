@@ -5,6 +5,9 @@ from langchain.messages import ToolMessage
 from langchain_core.runnables import RunnableConfig
 from app.agent.schemas import ReceiptItemBatchCreateSchema, ReceiptItemUpdateSchema, ReceiptItemOutSchema, AgentReceiptState
 from app.schemas.receipt_item import ReceiptItemUpdate
+from rapidfuzz import fuzz
+from dataclasses import dataclass
+
 
 from langgraph.types import Command
 
@@ -22,7 +25,6 @@ async def add_items(
     Добавляет новые позиции в чек.
 
     receipt_items_object: список позиций для добавления в чек
-
 
     Возвращает:
     Словарь с полем items - список добавленных позиций в виде словарей,
@@ -220,7 +222,6 @@ async def get_receipt_items(
     if not response.items:
         return Command(update={
             "error": None,
-            "id_map": {},
             "messages": [
                 ToolMessage(
                     content="В чеке отсутствуют позиции.",
@@ -240,7 +241,6 @@ async def get_receipt_items(
 
     return Command(update={
         "error": None,
-        "id_map": id_map,
         "messages": [
             ToolMessage(
                 content=str({"items": items_data}),
@@ -327,86 +327,206 @@ async def get_item(
     })
 
 
+@dataclass
+class ItemSearchResult:
+    """Результат поиска элемента"""
+    success: bool
+    item_id: int | None = None
+    item_name: str | None = None
+    error_type: str | None = None
+    error_message: str | None = None
+
+
+async def find_item_by_name(
+        search_query: str,
+        receipt_id: int,
+        db_client,
+) -> ItemSearchResult:
+    """
+    Ищет элемент чека по названию с использованием Fuzz поиска.
+
+    Args:
+        search_query: Поисковый запрос (название позиции)
+        receipt_id: ID чека
+        db_client: Клиент базы данных
+
+    Returns:
+        ItemSearchResult с найденным item_id или описанием ошибки
+    """
+    try:
+        response = await db_client.get_receipt_items(receipt_id)
+        items = response.items
+    except Exception as e:
+        return ItemSearchResult(
+            success=False,
+            error_type="fetch_failed",
+            error_message=f"Ошибка получения позиций: {str(e)}"
+        )
+
+    if not items:
+        return ItemSearchResult(
+            success=False,
+            error_type="no_items",
+            error_message="В чеке нет позиций."
+        )
+
+    matches: list[tuple[int, any]] = []
+
+    for item in items:
+        score = fuzz.partial_ratio(search_query.lower(), item.name.lower())
+        if score > 75:
+            matches.append((score, item))
+
+    matches.sort(key=lambda x: x[0], reverse=True)
+
+    if not matches:
+        return ItemSearchResult(
+            success=False,
+            error_type="not_found",
+            error_message=f"Позиция '{search_query}' не найдена. Уточни название."
+        )
+
+    if len(matches) > 1 and matches[0][0] - matches[1][0] < 10:
+        options = [m[1].name for m in matches[:3]]
+        return ItemSearchResult(
+            success=False,
+            error_type="ambiguous",
+            error_message=f"Найдено несколько похожих позиций: {options}. Уточни, какую изменить."
+        )
+
+    target = matches[0][1]
+
+    return ItemSearchResult(
+        success=True,
+        item_id=target.id,
+        item_name=target.name
+    )
+
+
 @tool
 async def update_item(
-    item_display_id: int,
-    item_info: ReceiptItemUpdateSchema,
-    runtime: ToolRuntime[None, AgentReceiptState],
+        search_query: str,
+        item_info: ReceiptItemUpdateSchema,
+        runtime: ToolRuntime[None, AgentReceiptState],
 ) -> Command:
     """
-        Обновляет позицию в текущем чеке.
+    Обновляет позицию в текущем чеке по названию.
 
-        Используй только после вызова get_receipt_items.
-        item_display_id — это отображаемый ID (номер в списке),
-        а не реальный ID из базы данных.
+    search_query — как пользователь называет позицию
 
-        item_info — объект с полями для обновления:
-        - name: новое название
-        - price: новая цена
-        - quantity: новое количество
+    item_info — объект с полями для обновления:
+    - name: новое название
+    - price: новая цена
+    - quantity: новое количество
     """
 
     config = runtime.config
-
     configurable = config.get("configurable", {})
-
     db_client = configurable.get("db_client")
-    id_map = runtime.state.get("id_map", {})
+    receipt_id = configurable.get("receipt_id")
 
-    if not db_client:
+    if not db_client or not receipt_id:
         return Command(update={
-            "error": "no_db_connection",
+            "error": "config_error",
             "messages": [
                 ToolMessage(
-                    content="Системная ошибка: нет подключения к БД.",
+                    content="Системная ошибка конфигурации.",
                     tool_call_id=runtime.tool_call_id,
                 )
             ],
         })
 
-    item_real_id = id_map.get(item_display_id)
-    if not item_real_id:
+    search_result = await find_item_by_name(search_query, receipt_id, db_client)
+
+    if not search_result.success:
         return Command(update={
-            "error": "invalid_display_id",
+            "error": search_result.error_type,
             "messages": [
                 ToolMessage(
-                    content="Сначала получи список позиций через get_receipt_items.",
+                    content=search_result.error_message,
                     tool_call_id=runtime.tool_call_id,
                 )
             ],
         })
 
     try:
-        response = await db_client.update_item(
-            item_real_id,
+        updated = await db_client.update_item(
+            search_result.item_id,
             item_info.to_db_update()
         )
-
     except Exception as e:
         return Command(update={
             "error": "update_failed",
             "messages": [
                 ToolMessage(
-                    content=f"Ошибка при обновлении позиции: {str(e)}",
+                    content=f"Ошибка при обновлении: {str(e)}",
                     tool_call_id=runtime.tool_call_id,
                 )
             ],
         })
-
-    result = ReceiptItemOutSchema.model_validate({
-        **response.model_dump(),
-        "id": item_display_id
-    }).model_dump()
 
     return Command(update={
         "error": None,
         "receipt_updated": True,
         "messages": [
             ToolMessage(
-                content=str(result),
+                content=f"Позиция '{updated.name}' успешно обновлена.",
                 tool_call_id=runtime.tool_call_id,
             )
         ],
+    })
+
+
+@tool
+async def delete_item(
+        search_query: str,
+        runtime: ToolRuntime[None, AgentReceiptState],
+) -> Command:
+    """Удаляет позицию из чека по названию."""
+
+    config = runtime.config
+    configurable = config.get("configurable", {})
+    db_client = configurable.get("db_client")
+    receipt_id = configurable.get("receipt_id")
+
+    if not db_client or not receipt_id:
+        return Command(update={
+            "error": "config_error",
+            "messages": [ToolMessage(
+                content="Системная ошибка конфигурации.",
+                tool_call_id=runtime.tool_call_id,
+            )],
+        })
+
+    search_result = await find_item_by_name(search_query, receipt_id, db_client)
+
+    if not search_result.success:
+        return Command(update={
+            "error": search_result.error_type,
+            "messages": [ToolMessage(
+                content=search_result.error_message,
+                tool_call_id=runtime.tool_call_id,
+            )],
+        })
+
+    try:
+        await db_client.delete_item(search_result.item_id)
+    except Exception as e:
+        return Command(update={
+            "error": "delete_failed",
+            "messages": [ToolMessage(
+                content=f"Ошибка при удалении: {str(e)}",
+                tool_call_id=runtime.tool_call_id,
+            )],
+        })
+
+    return Command(update={
+        "error": None,
+        "receipt_updated": True,
+        "messages": [ToolMessage(
+            content=f"Позиция '{search_result.item_name}' успешно удалена.",
+            tool_call_id=runtime.tool_call_id,
+        )],
     })
 
 # @tool

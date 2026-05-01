@@ -9,8 +9,6 @@ CREATE TABLE receipts (
     id SERIAL PRIMARY KEY,
     creator_id INTEGER NOT NULL,
     paid_at TIMESTAMP NULL,
-    tip DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
-    service DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
     place_name VARCHAR(255) NULL,
     status VARCHAR(50) NOT NULL DEFAULT 'parsing',
     created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,

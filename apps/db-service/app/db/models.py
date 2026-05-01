@@ -31,8 +31,6 @@ class Receipt(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     creator_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="RESTRICT", onupdate="CASCADE"))
     paid_at: Mapped[datetime | None] = mapped_column(nullable=True)
-    tip: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("0.00"))
-    service: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal("0.00"))
     place_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     status: Mapped[str] = mapped_column(String(50), default="parsing", nullable=False)
     created_at: Mapped[datetime] = mapped_column(nullable=False, default=lambda: datetime.now(timezone.utc))

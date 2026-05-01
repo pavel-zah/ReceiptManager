@@ -8,3 +8,4 @@ langchain-openrouter==0.2.0
 langgraph-checkpoint-postgres==3.0.5
 psycopg-binary==3.3.3
 psycopg-pool==3.3.0
+RapidFuzz==3.14.5

@@ -12,8 +12,6 @@ class ReceiptCreate(BaseModel):
 
     creator_id: int
     paid_at: datetime | None = None
-    tip: Decimal = Decimal("0.00")
-    service: Decimal = Decimal("0.00")
     place_name: str | None = None
     status: Literal["parsing", "draft", "assigned", "archived"] = "parsing"
 
@@ -32,8 +30,6 @@ class ReceiptUpdate(BaseModel):
     model_config = ConfigDict(str_strip_whitespace=True)
 
     paid_at: datetime | None = None
-    tip: Decimal | None = None
-    service: Decimal | None = None
     place_name: str | None = None
     status: Literal["parsing", "draft", "assigned", "archived"] | None = None
 
@@ -57,8 +53,6 @@ class ReceiptOut(BaseModel):
     id: int
     creator_id: int
     paid_at: datetime | None
-    tip: Decimal
-    service: Decimal
     place_name: str | None
     status: str
     created_at: datetime

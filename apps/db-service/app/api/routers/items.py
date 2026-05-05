@@ -84,14 +84,25 @@ def list_assignments(item_id: int, db: Session = Depends(get_db)):
     item = db.get(ReceiptItem, item_id)
     if not item:
         raise HTTPException(status_code=404, detail="Item not found")
-    return item.assignments
+    
+    assignments_data = []
+    for assignment in item.assignments:
+        assignments_data.append({
+            "item_id": assignment.item_id,
+            "user_id": assignment.user_id,
+            "paid": assignment.paid,
+            "username": assignment.user.username,
+            "user_public_name": assignment.user.user_public_name
+        })
+    return assignments_data
 
 
 @router.post("/{item_id}/assignments/{user_id}", response_model=AssignmentOut, status_code=201)
 def assign_item(item_id: int, user_id: int, paid: str = "not paid", db: Session = Depends(get_db)):
     if not db.get(ReceiptItem, item_id):
         raise HTTPException(status_code=404, detail="Item not found")
-    if not db.get(User, user_id):
+    user = db.get(User, user_id)
+    if not user:
         raise HTTPException(status_code=404, detail="User not found")
     if db.get(ItemAssignment, (item_id, user_id)):
         raise HTTPException(status_code=409, detail="Assignment already exists")
@@ -102,7 +113,13 @@ def assign_item(item_id: int, user_id: int, paid: str = "not paid", db: Session 
     db.add(assignment)
     db.commit()
     db.refresh(assignment)
-    return assignment
+    return {
+        "item_id": assignment.item_id,
+        "user_id": assignment.user_id,
+        "paid": assignment.paid,
+        "username": user.username,
+        "user_public_name": user.user_public_name
+    }
 
 
 @router.delete("/{item_id}/assignments/{user_id}", status_code=204)
@@ -125,4 +142,10 @@ def update_assignment_paid_status(item_id: int, user_id: int, paid: str, db: Ses
     assignment.paid = normalized_paid
     db.commit()
     db.refresh(assignment)
-    return assignment
+    return {
+        "item_id": assignment.item_id,
+        "user_id": assignment.user_id,
+        "paid": assignment.paid,
+        "username": assignment.user.username,
+        "user_public_name": assignment.user.user_public_name
+    }

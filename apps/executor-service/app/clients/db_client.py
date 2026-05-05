@@ -10,7 +10,8 @@ from typing import Any, List
 from app.core.config import settings
 from app.core.logger import get_logger
 from app.schemas.receipt_item import ReceiptItemCreate, ReceiptItemUpdate, ReceiptItemOut, ReceiptItemBatchOut
-from app.schemas.receipt import ReceiptUpdate
+from app.schemas.receipt import ReceiptUpdate, ReceiptOut
+from app.api.schemas import AssignmentOut, ParticipantOut, UserOut, UserCreate
 from fastapi.encoders import jsonable_encoder
 
 
@@ -218,3 +219,256 @@ class DBClient:
             f"/receipts/{receipt_id}",
             json=data
         )
+
+    async def get_receipt(
+            self,
+            receipt_id: int
+    ) -> ReceiptOut | None:
+        """
+        Метод для получения информации о чеке
+        Args:
+            receipt_id: id чека
+        Returns:
+            Валидированный объект с информацией о чеке. None, если чек не найден
+        """
+        try:
+            response_data = await self._request(
+                "GET",
+                f"/receipts/{receipt_id}",
+            )
+
+            return ReceiptOut.model_validate(response_data)
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                logger.info(f"Receipt with id {receipt_id} not found in DB.")
+                return None
+            raise
+
+
+    """
+    Методы для работы с назначениями блюд на пользователей
+    """
+    async def assign_user_to_item(
+            self,
+            item_id: int,
+            user_id: int,
+            paid: str = "not paid"
+    ) -> AssignmentOut:
+        """
+        Метод для назначения пользователя на блюдо (позицию в чеке)
+        Args:
+            item_id: id позиции
+            user_id: id пользователя
+            paid: статус оплаты (not paid, on review, paid)
+        Returns:
+            Валидированный объект с информацией о назначении
+        """
+        response_data = await self._request(
+            "POST",
+            f"/items/{item_id}/assignments/{user_id}",
+            params={"paid": paid}
+        )
+        
+        logger.info(f"User {user_id} assigned to item {item_id} with paid status: {paid}")
+        return AssignmentOut.model_validate(response_data)
+
+
+    async def unassign_user_from_item(
+            self,
+            item_id: int,
+            user_id: int
+    ) -> None:
+        """
+        Метод для удаления назначения пользователя на блюдо
+        Args:
+            item_id: id позиции
+            user_id: id пользователя
+        Returns:
+            None: ничего не возвращает при успехе, либо выбрасывает исключение
+        """
+        await self._request(
+            "DELETE",
+            f"/items/{item_id}/assignments/{user_id}"
+        )
+        
+        logger.info(f"User {user_id} unassigned from item {item_id}")
+
+
+    async def update_assignment_payment_status(
+            self,
+            item_id: int,
+            user_id: int,
+            paid: str
+    ) -> AssignmentOut:
+        """
+        Метод для изменения статуса оплаты назначения
+        Args:
+            item_id: id позиции
+            user_id: id пользователя
+            paid: новый статус оплаты (not paid, on review, paid)
+        Returns:
+            Валидированный объект с обновленной информацией о назначении
+        """
+        response_data = await self._request(
+            "PATCH",
+            f"/items/{item_id}/assignments/{user_id}/paid",
+            params={"paid": paid}
+        )
+        
+        logger.info(f"Payment status for user {user_id} on item {item_id} updated to: {paid}")
+        return AssignmentOut.model_validate(response_data)
+
+
+    async def get_item_assignments(
+            self,
+            item_id: int
+    ) -> List[AssignmentOut]:
+        """
+        Метод для получения списка всех назначений на блюдо
+        Args:
+            item_id: id позиции
+        Returns:
+            Список валидированных объектов с информацией о назначениях
+        """
+        try:
+            response_data = await self._request(
+                "GET",
+                f"/items/{item_id}/assignments"
+            )
+            
+            if not response_data:
+                logger.info(f"No assignments found for item {item_id}")
+                return []
+            
+            logger.info(f"Retrieved {len(response_data)} assignments for item {item_id}")
+            return [AssignmentOut.model_validate(assignment) for assignment in response_data]
+        
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                logger.info(f"Item with id {item_id} not found in DB.")
+                return []
+            raise
+
+
+    """
+    Методы для работы с участниками комнаты
+    """
+    """
+    Методы для работы с пользователями
+    """
+    async def create_user(
+            self,
+            payload: UserCreate
+    ) -> UserOut:
+        """
+        Метод для создания пользователя
+        Args:
+            payload: информация для создания пользователя
+        Returns:
+            Валидированный объект с информацией о созданном пользователе
+        """
+        data = jsonable_encoder(
+            payload.model_dump(exclude_none=True)
+        )
+        
+        response_data = await self._request(
+            "POST",
+            "/users/",
+            json=data
+        )
+        
+        logger.info(f"User {payload.username} created successfully")
+        return UserOut.model_validate(response_data)
+
+
+    async def get_user(
+            self,
+            user_id: int
+    ) -> UserOut | None:
+        """
+        Метод для получения информации о пользователе
+        Args:
+            user_id: id пользователя
+        Returns:
+            Валидированный объект с информацией о пользователе. None, если пользователь не найден
+        """
+        try:
+            response_data = await self._request(
+                "GET",
+                f"/users/{user_id}"
+            )
+            
+            logger.info(f"Retrieved user {user_id}")
+            return UserOut.model_validate(response_data)
+        
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                logger.info(f"User with id {user_id} not found in DB.")
+                return None
+            raise
+
+
+    async def update_user(
+            self,
+            user_id: int,
+            username: str | None = None,
+            user_public_name: str | None = None
+    ) -> UserOut:
+        """
+        Метод для обновления информации о пользователе
+        Args:
+            user_id: id пользователя
+            username: новое имя пользователя (опционально)
+            user_public_name: новое публичное имя пользователя (опционально)
+        Returns:
+            Валидированный объект с обновленной информацией о пользователе
+        """
+        data = {}
+        if username is not None:
+            data["username"] = username
+        if user_public_name is not None:
+            data["user_public_name"] = user_public_name
+        
+        response_data = await self._request(
+            "PATCH",
+            f"/users/{user_id}",
+            json=data
+        )
+        
+        logger.info(f"User {user_id} updated successfully")
+        return UserOut.model_validate(response_data)
+
+
+    """  
+    Методы для работы с участниками комнаты
+    """
+    async def get_room_participants(
+            self,
+            room_id: int
+    ) -> List[ParticipantOut]:
+        """
+        Метод для получения списка участников комнаты
+        Args:
+            room_id: id комнаты
+        Returns:
+            Список валидированных объектов с информацией об участниках
+        """
+        try:
+            response_data = await self._request(
+                "GET",
+                f"/rooms/{room_id}/participants"
+            )
+            
+            # если комната существует но участников нет, вернем пустой список
+            if not response_data:
+                logger.info(f"No participants found in room {room_id}")
+                return []
+            
+            logger.info(f"Retrieved {len(response_data)} participants from room {room_id}")
+            return [ParticipantOut.model_validate(participant) for participant in response_data]
+        
+        except httpx.HTTPStatusError as e:
+            if e.response.status_code == 404:
+                logger.info(f"Room with id {room_id} not found in DB.")
+                return []
+            raise

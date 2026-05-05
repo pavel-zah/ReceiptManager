@@ -17,6 +17,12 @@ def create_room(payload: RoomCreate, db: Session = Depends(get_db)):
     db.add(room)
     db.commit()
     db.refresh(room)
+    
+    # Автоматически добавляем создателя в участники комнаты
+    participant = RoomParticipant(room_id=room.id, user_id=payload.creator_id)
+    db.add(participant)
+    db.commit()
+    
     return room
 
 

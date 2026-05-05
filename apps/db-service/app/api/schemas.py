@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import List, Literal
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator, computed_field
 
 
 """Receipt schemas"""
@@ -77,6 +77,13 @@ class UserOut(BaseModel):
     registered_at: datetime
 
 
+class UserUpdate(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    username: str | None = None
+    user_public_name: str | None = None
+
+
 """Room schemas"""
 
 
@@ -148,6 +155,8 @@ class ParticipantOut(BaseModel):
 
     room_id: int
     user_id: int
+    username: str
+    user_public_name: str | None
     joined_at: datetime
 
 
@@ -241,3 +250,5 @@ class AssignmentOut(BaseModel):
     item_id: int
     user_id: int
     paid: str
+    username: str | None = None
+    user_public_name: str | None = None

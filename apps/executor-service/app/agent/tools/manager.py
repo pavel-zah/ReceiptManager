@@ -4,7 +4,9 @@ from app.agent.tools.receipt_config_tools import (add_items,
                                                   get_receipt_items,
                                                   get_item,
                                                   update_item,
-                                                  delete_item
+                                                  delete_item,
+                                                  update_receipt,
+                                                  get_receipt_info
                                                   )
 
 
@@ -19,7 +21,7 @@ def build_tools_list() -> list:
 @lru_cache(maxsize=1)
 def build_receipt_tools_list() -> list:
     """Создаёт список из callable receipt tools (singleton)"""
-    return [add_items, get_receipt_items, get_item, update_item, delete_item]
+    return [add_items, get_receipt_items, get_item, update_item, delete_item, update_receipt, get_receipt_info]
 
 
 

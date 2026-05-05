@@ -3,7 +3,7 @@ from app.core.logger import get_logger
 from langchain.tools import tool, ToolRuntime
 from langchain.messages import ToolMessage
 from langchain_core.runnables import RunnableConfig
-from app.agent.schemas import ReceiptItemBatchCreateSchema, ReceiptItemUpdateSchema, ReceiptItemOutSchema, AgentReceiptState
+from app.agent.schemas import ReceiptItemBatchCreateSchema, ReceiptItemUpdateSchema, ReceiptItemOutSchema, AgentReceiptState, ReceiptUpdateSchema
 from app.schemas.receipt_item import ReceiptItemUpdate
 from rapidfuzz import fuzz
 from dataclasses import dataclass
@@ -528,6 +528,154 @@ async def delete_item(
             tool_call_id=runtime.tool_call_id,
         )],
     })
+
+
+@tool
+async def update_receipt(
+        receipt_info: ReceiptUpdateSchema,
+        runtime: ToolRuntime[None, AgentReceiptState],
+) -> Command:
+    """
+    Обновляет информацию о текущем чеке.
+
+    receipt_info — объект с полями для обновления:
+    - paid_at: дата оплаты (формат YYYY-MM-DD или YYYY-MM-DD HH:MM:SS)
+    - place_name: название заведения
+    """
+
+    config = runtime.config
+    configurable = config.get("configurable", {})
+    db_client = configurable.get("db_client")
+    receipt_id = configurable.get("receipt_id")
+
+    if not db_client or not receipt_id:
+        return Command(update={
+            "error": "config_error",
+            "messages": [ToolMessage(
+                content="Системная ошибка конфигурации.",
+                tool_call_id=runtime.tool_call_id,
+            )],
+        })
+
+    try:
+        db_update = receipt_info.to_db_update()
+        await db_client.update_receipt(receipt_id, db_update)
+    except ValueError as e:
+        return Command(update={
+            "error": "validation_error",
+            "messages": [ToolMessage(
+                content=str(e),
+                tool_call_id=runtime.tool_call_id,
+            )],
+        })
+    except Exception as e:
+        return Command(update={
+            "error": "update_failed",
+            "messages": [ToolMessage(
+                content=f"Ошибка при обновлении информации о чеке: {str(e)}",
+                tool_call_id=runtime.tool_call_id,
+            )],
+        })
+
+    return Command(update={
+        "error": None,
+        "receipt_updated": True,
+        "messages": [ToolMessage(
+            content="Информация о чеке успешно обновлена.",
+            tool_call_id=runtime.tool_call_id,
+        )],
+    })
+
+
+@tool
+async def get_receipt_info(
+    runtime: ToolRuntime[None, AgentReceiptState],
+) -> Command:
+    """
+    Получает информацию о текущем чеке: дата оплаты и название места.
+    
+    Используется для получения актуальной информации о дате оплаты (paid_at)
+    и названии заведения (place_name).
+    """
+    
+    config = runtime.config
+    configurable = config.get("configurable", {})
+    db_client = configurable.get("db_client")
+    receipt_id = configurable.get("receipt_id")
+
+    if not db_client:
+        return Command(update={
+            "error": "no_db_connection",
+            "messages": [
+                ToolMessage(
+                    content="Системная ошибка: нет подключения к БД.",
+                    tool_call_id=runtime.tool_call_id,
+                )
+            ],
+        })
+
+    if not receipt_id:
+        return Command(update={
+            "error": "no_receipt_id",
+            "messages": [
+                ToolMessage(
+                    content="Ошибка: отсутствует ID чека.",
+                    tool_call_id=runtime.tool_call_id,
+                )
+            ],
+        })
+
+    try:
+        response = await db_client.get_receipt(receipt_id)
+
+    except httpx.HTTPStatusError as e:
+        return Command(update={
+            "error": f"http_{e.response.status_code if e.response else 'unknown'}",
+            "messages": [
+                ToolMessage(
+                    content="Ошибка API при получении информации о чеке.",
+                    tool_call_id=runtime.tool_call_id,
+                )
+            ],
+        })
+
+    except Exception as e:
+        return Command(update={
+            "error": "unexpected_error",
+            "messages": [
+                ToolMessage(
+                    content=f"Непредвиденная ошибка: {str(e)}",
+                    tool_call_id=runtime.tool_call_id,
+                )
+            ],
+        })
+
+    if not response:
+        return Command(update={
+            "error": "receipt_not_found",
+            "messages": [
+                ToolMessage(
+                    content="Чек не найден в базе данных.",
+                    tool_call_id=runtime.tool_call_id,
+                )
+            ],
+        })
+
+    receipt_info = {
+        "paid_at": response.paid_at.isoformat() if response.paid_at else None,
+        "place_name": response.place_name,
+    }
+
+    return Command(update={
+        "error": None,
+        "messages": [
+            ToolMessage(
+                content=str(receipt_info),
+                tool_call_id=runtime.tool_call_id,
+            )
+        ],
+    })
+
 
 # @tool
 # async def delete_item(???, config: RunnableConfig) -> str:

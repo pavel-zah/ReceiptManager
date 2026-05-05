@@ -46,6 +46,40 @@ class ReceiptItemUpdateSchema(BaseModel):
         return ReceiptItemUpdate(**update_data)
 
 
+class ReceiptUpdateSchema(BaseModel):
+    """
+    Сущность для обновления информации о чеке
+    """
+    paid_at: str | None = Field(
+        default=None,
+        description="Дата оплаты чека в формате YYYY-MM-DD или YYYY-MM-DD HH:MM:SS"
+    )
+    place_name: str | None = Field(
+        default=None,
+        description="Название заведения, где был совершен заказ"
+    )
+
+    def to_db_update(self):
+        from app.schemas.receipt import ReceiptUpdate
+        from datetime import datetime
+        
+        update_data = self.model_dump(exclude_unset=True, exclude_none=True)
+        
+        # Преобразуем строку даты в datetime
+        if "paid_at" in update_data and update_data["paid_at"]:
+            try:
+                # Пытаемся парсить в разные форматы
+                try:
+                    update_data["paid_at"] = datetime.fromisoformat(update_data["paid_at"])
+                except ValueError:
+                    # Если не сработал ISO format, пробуем другой
+                    update_data["paid_at"] = datetime.strptime(update_data["paid_at"], "%Y-%m-%d %H:%M:%S")
+            except ValueError as e:
+                raise ValueError(f"Неверный формат даты: {update_data['paid_at']}. Используй YYYY-MM-DD или YYYY-MM-DD HH:MM:SS")
+        
+        return ReceiptUpdate(**update_data)
+
+
 class ReceiptItemBatchCreateSchema(BaseModel):
     """
     Сущность с информацией о позициях для добавления в чек позициях

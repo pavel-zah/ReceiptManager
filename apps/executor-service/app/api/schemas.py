@@ -22,15 +22,18 @@ class Transcription(BaseModel):
 # ──────────────────────────────
 
 class UserCreate(BaseModel):
-    id: str
+    model_config = ConfigDict(str_strip_whitespace=True, str_min_length=1)
+
     username: str
+    user_public_name: str | None = None
 
 
 class UserOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    id: str
+    id: int
     username: str
+    user_public_name: str | None
     registered_at: datetime
 
 
@@ -91,6 +94,8 @@ class ParticipantOut(BaseModel):
 
     room_id: str
     user_id: str
+    username: str
+    user_public_name: str | None
     joined_at: datetime | None
 
 

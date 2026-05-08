@@ -79,9 +79,27 @@ services:
         condition: service_healthy
       postgres-room-checkpointer:
         condition: service_healthy
+      asr-service:
+        condition: service_started
     healthcheck:
       test: [ "CMD", "curl", "-f", "http://localhost:${EXEC_SERVICE_PORT}/health" ]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 30s
+
+  asr-service:
+    build: ./apps/asr-service
+    env_file:
+      - .env
+    ports:
+      - ${ASR_SERVICE_PORT:-5030}:5030
+    environment:
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - ASR_MODEL=${ASR_MODEL:-mistralai/voxtral-small-24b-2507}
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:5030/api/v1/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s

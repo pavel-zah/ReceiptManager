@@ -32,15 +32,12 @@ class Receipt:
     """Сущность Чек"""
     id: str
     paid_at: datetime
-    tip: Decimal = Decimal("0.00")
-    service: Decimal = Decimal("0.00")
     items: List[ReceiptItem] = field(default_factory=list)
 
     @property
     def total_sum(self) -> Decimal:
         """Бизнес-правило: итоговая сумма зависит от позиций"""
-        items_price = sum([item.total_price for item in self.items], start=Decimal("0.00"))
-        return items_price + self.tip + self.service
+        return sum([item.total_price for item in self.items], start=Decimal("0.00"))
 
     def add_item(self, name: str, price: Decimal, quantity: Decimal, item_id: str) -> None:
         """Бизнес-правило: в чеке не может быть двух одинаковых позиций"""

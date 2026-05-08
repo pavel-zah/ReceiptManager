@@ -1,15 +1,30 @@
 from fastapi import FastAPI
-
-from routers import items, receipts, rooms, users
+from app.api.routers import items, receipts, rooms, users
+# from contextlib import asynccontextmanager
+import uvicorn
 
 app = FastAPI(title="DB Service", version="1.0.0")
 
-app.include_router(users.router)
-app.include_router(receipts.router)
-app.include_router(rooms.router)
-app.include_router(items.router)
+# @asynccontextmanager
+# async def lifespan(app: FastAPI):
 
+#     yield
 
-@app.get("/health")
-def health():
-    return {"status": "ok"}
+def create_app() -> FastAPI:
+    app = FastAPI(title="DB API", version="1.0.0")
+
+    app.include_router(users.router)
+    app.include_router(receipts.router)
+    app.include_router(rooms.router)
+    app.include_router(items.router)
+
+    @app.get("/health")
+    def health():
+        return {"status": "ok"}
+
+    return app
+
+app = create_app()
+
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)

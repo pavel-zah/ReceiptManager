@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
+from sqlalchemy import select
 from app.db.database import get_db
 from app.db.models import Receipt, Room, RoomParticipant, User
 from app.api.schemas import ParticipantOut, RoomCreate, RoomOut, RoomUpdate
@@ -28,7 +29,11 @@ def create_room(payload: RoomCreate, db: Session = Depends(get_db)):
 
 @router.get("/{room_id}", response_model=RoomOut)
 def get_room(room_id: int, db: Session = Depends(get_db)):
-    room = db.get(Room, room_id)
+    room = db.execute(
+        select(Room).where(Room.id == room_id).options(
+            selectinload(Room.participants).selectinload(RoomParticipant.user)
+        )
+    ).scalars().first()
     if not room:
         raise HTTPException(status_code=404, detail="Room not found")
     return room
@@ -59,10 +64,15 @@ def delete_room(room_id: int, db: Session = Depends(get_db)):
 
 @router.get("/{room_id}/participants", response_model=list[ParticipantOut])
 def list_participants(room_id: int, db: Session = Depends(get_db)):
-    room = db.get(Room, room_id)
-    if not room:
+    if not db.get(Room, room_id):
         raise HTTPException(status_code=404, detail="Room not found")
-    return room.participants
+    
+    participants = db.execute(
+        select(RoomParticipant)
+        .where(RoomParticipant.room_id == room_id)
+        .options(selectinload(RoomParticipant.user))
+    ).scalars().all()
+    return participants
 
 
 @router.post("/{room_id}/participants/{user_id}", response_model=ParticipantOut, status_code=201)
@@ -77,7 +87,7 @@ def add_participant(room_id: int, user_id: int, db: Session = Depends(get_db)):
     participant = RoomParticipant(room_id=room_id, user_id=user_id)
     db.add(participant)
     db.commit()
-    db.refresh(participant)
+    db.refresh(participant, ["user"])
     return participant
 
 

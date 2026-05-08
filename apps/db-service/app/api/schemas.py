@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import List, Literal
-from pydantic import BaseModel, ConfigDict, field_validator, computed_field
+from pydantic import BaseModel, ConfigDict, field_validator, computed_field, model_validator
 
 
 """Receipt schemas"""
@@ -155,9 +155,18 @@ class ParticipantOut(BaseModel):
 
     room_id: int
     user_id: int
-    username: str
-    user_public_name: str | None
     joined_at: datetime
+    user: "UserOut"
+
+    @computed_field
+    @property
+    def username(self) -> str:
+        return self.user.username
+
+    @computed_field
+    @property
+    def user_public_name(self) -> str | None:
+        return self.user.user_public_name
 
 
 """ReceiptItem schema"""

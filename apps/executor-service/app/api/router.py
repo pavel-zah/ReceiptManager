@@ -49,7 +49,7 @@ async def chat_with_agent(
     }
 
     if "action_required" in response and response["action_required"]:
-        result["action_required"] = response["receipt_updated"]
+        result["action_required"] = response["action_required"]
     if "error" in response and response["error"]:
         result["error"] = response["error"]
 
@@ -125,7 +125,7 @@ async def process_voice_message(
         }
 
         if "action_required" in response and response["action_required"]:
-            result["action_required"] = response["receipt_updated"]
+            result["action_required"] = response["action_required"]
         if "error" in response and response["error"]:
             result["error"] = response["error"]
 

@@ -98,9 +98,10 @@ class Settings(BaseSettings):
     db_query_timeout: int = 30
 
     # ASR SERVICE
-    asr_service_host: str = "localhost"
+    asr_service_host: str = "asr-service"
     asr_service_port: int = 5030
     asr_timeout_seconds: int = 10
+    asr_temperature: int = 0
     
     @computed_field
     @property

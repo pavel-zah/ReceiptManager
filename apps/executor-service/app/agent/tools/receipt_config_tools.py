@@ -130,7 +130,7 @@ async def add_items(
         return Command(
             update={
                 "error": None,
-                "receipt_updated": True,
+                "action_required": True,
                 "messages": [
                     ToolMessage(
                     content=response_message,
@@ -467,7 +467,7 @@ async def update_item(
 
     return Command(update={
         "error": None,
-        "receipt_updated": True,
+        "action_required": True,
         "messages": [
             ToolMessage(
                 content=f"Позиция '{updated.name}' успешно обновлена.",
@@ -522,7 +522,7 @@ async def delete_item(
 
     return Command(update={
         "error": None,
-        "receipt_updated": True,
+        "action_required": True,
         "messages": [ToolMessage(
             content=f"Позиция '{search_result.item_name}' успешно удалена.",
             tool_call_id=runtime.tool_call_id,
@@ -579,7 +579,7 @@ async def update_receipt(
 
     return Command(update={
         "error": None,
-        "receipt_updated": True,
+        "action_required": True,
         "messages": [ToolMessage(
             content="Информация о чеке успешно обновлена.",
             tool_call_id=runtime.tool_call_id,

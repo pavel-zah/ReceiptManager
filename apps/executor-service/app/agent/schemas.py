@@ -7,9 +7,8 @@ from app.schemas.receipt_item import ReceiptItemCreate, ReceiptItemUpdate, Recei
 from decimal import Decimal
 import operator
 
-# ===============
+
 # Receipt schemas
-# ===============
 class ReceiptItemCreateSchema(BaseModel):
     """
     Сущность для создания позиции в чеке
@@ -106,46 +105,55 @@ class ReceiptItemBatchOutSchema(BaseModel):
     items: List[ReceiptItemOutSchema] = Field(description="список добавленных позиций")
 
 
-# ====================
+
 # Agent Context Schema
-# ====================
+
+
+
+class AgentState(TypedDict):
+    """
+    Контекст, который прокидывается в tools агента.
+    """
+    messages: Annotated[list, operator.add]
+
+    user_id: int
+
+    receipt_id: int | None
+
+    action_required: bool
+    error: str | None
+
+
 
 class AgentRoomState(TypedDict):
     """
     Контекст, который прокидывается в tools агента.
     """
     messages: Annotated[list, operator.add]
-    current_command: str
-    answer: str
-    params: dict | None
-    error: str | None
-    receipt_updated: bool
-    execution_result: str
-    items_to_add: ReceiptItemBatchCreateSchema
-    added_items: ReceiptItemBatchOutSchema
-    receipt_items: ReceiptItemBatchOutSchema
 
-    # receipt_id: str | None = None
-    # room_id: str | None = None
-    # user_id: str | None = None
+    user_id: int
+
+    receipt_id: int | None
+
+    assignment_updated: bool
+    error: str | None
 
 
 
 class AgentReceiptState(TypedDict):
     messages: Annotated[list, operator.add]
 
-    user_id: str
+    user_id: int
 
-    receipt_id: str | None
-    id_map: dict[int, str]
+    receipt_id: int | None
 
     receipt_updated: bool
     error: str | None
 
 
-# =====================
+
 # Agent Response Schema
-# =====================
+
 
 
 class ResponseFormatSchema(BaseModel):

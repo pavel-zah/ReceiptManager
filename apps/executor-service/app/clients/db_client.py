@@ -263,14 +263,27 @@ class DBClient:
         Returns:
             Валидированный объект с информацией о назначении
         """
-        response_data = await self._request(
-            "POST",
-            f"/items/{item_id}/assignments/{user_id}",
-            params={"paid": paid}
-        )
-        
-        logger.info(f"User {user_id} assigned to item {item_id} with paid status: {paid}")
-        return AssignmentOut.model_validate(response_data)
+        try:
+            response_data = await self._request(
+                "POST",
+                f"/items/{item_id}/assignments/{user_id}",
+                params={"paid": paid}
+            )
+            
+            logger.info(f"User {user_id} assigned to item {item_id} with paid status: {paid}")
+            return AssignmentOut.model_validate(response_data)
+        except httpx.HTTPStatusError as e:
+            # Если назначение уже существует, это нормальный результат
+            if e.response.status_code == 409:
+                logger.info(f"Assignment already exists for user {user_id} on item {item_id}")
+                # Получаем существующее назначение
+                assignments = await self.get_item_assignments(item_id)
+                for assignment in assignments:
+                    if assignment.user_id == user_id:
+                        return assignment
+                # Если почему-то не нашли, re-raise
+                raise
+            raise
 
 
     async def unassign_user_from_item(

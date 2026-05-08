@@ -9,9 +9,9 @@ from typing import Callable
 
 
 from app.agent.llm import get_llm
-from app.agent.prompts import RECEIPT_SYSTEM_PROMPT
-from app.agent.schemas import AgentRoomState
-from app.agent.tools.manager import get_all_tools, get_receipt_tools
+from app.agent.prompts import RECEIPT_SYSTEM_PROMPT, ROOM_SYSTEM_PROMPT
+from app.agent.schemas import AgentRoomState, AgentReceiptState, AgentState
+from app.agent.tools.manager import get_all_tools, get_receipt_tools, get_room_tools
 from app.core.config import settings
 from app.core.logger import get_logger
 
@@ -169,13 +169,25 @@ class AgentExecutor:
                         "args": tool_call.get("args"),
                     })
 
-        return {
+        response = {
             "answer": final_answer,
-            "receipt_updated": result.get("receipt_updated", False),
             "tools_used": [tc["name"] for tc in tool_calls],
             "tool_calls": tool_calls,
             "message_count": len(messages),
         }
+
+        # Добавляем специфичные для каждого агента поля
+        if "receipt_updated" in result:
+            response["receipt_updated"] = result.get("receipt_updated", False)
+        if "assignment_updated" in result:
+            response["assignment_updated"] = result.get("assignment_updated", False)
+        if "action_required" in result:
+            response["action_required"] = result.get("action_required", False)
+        if "error" in result:
+            errors = result.get("error", [])
+            response["error"] = errors[0] if errors else None
+
+        return response
 
 
 
@@ -194,14 +206,31 @@ def build_default_agent() -> AgentExecutor:
 def build_receipt_agent(
         checkpointer: AsyncPostgresSaver | None = None
 ) -> AgentExecutor:
-    """Создаёт агента по умолчанию (singleton)"""
+    """Создаёт агента по управлению чеком (singleton)"""
     tools = get_receipt_tools()
     prompt = RECEIPT_SYSTEM_PROMPT
 
     agent = (AgentBuilder().
              with_tools(tools).
              with_system_prompt(prompt).
-             with_state_schema(AgentRoomState).
+             with_state_schema(AgentState).
+             with_memory(checkpointer).
+             build())
+    return AgentExecutor(agent)
+
+
+@lru_cache(maxsize=1)
+def build_room_agent(
+        checkpointer: AsyncPostgresSaver | None = None
+) -> AgentExecutor:
+    """Создаёт агента по управлению комнатой (singleton)"""
+    tools = get_room_tools()
+    prompt = ROOM_SYSTEM_PROMPT
+
+    agent = (AgentBuilder().
+             with_tools(tools).
+             with_system_prompt(prompt).
+             with_state_schema(AgentState).
              with_memory(checkpointer).
              build())
     return AgentExecutor(agent)
@@ -239,46 +268,23 @@ def get_receipt_agent(checkpointer: AsyncPostgresSaver | None = None) -> AgentEx
 
     return _receipt_agent_executor
 
+_room_agent_executor: AgentExecutor | None = None
 
-# ============================================
-# Специализированные агенты
-# ============================================
 
-# def get_sql_agent() -> AgentExecutor:
-#     """
-#     Создаёт агента специализированного на SQL запросах.
-#     """
-#     from app.agent.tools.db_query import DBQueryTool
-#     from app.agent.prompts import SQL_AGENT_PROMPT
-#
-#     agent = (
-#         AgentBuilder()
-#         .with_tools([DBQueryTool()])
-#         .with_system_prompt(SQL_AGENT_PROMPT)
-#         .build()
-#     )
-#
-#     return AgentExecutor(agent)
-#
+def get_room_agent(checkpointer: AsyncPostgresSaver | None = None) -> AgentExecutor:
+    """
+    Возвращает singleton инстанс агента по управлению комнатой.
 
-# def get_research_agent() -> AgentExecutor:
-#     """
-#     Создаёт агента для исследовательских задач с веб-поиском.
-#     """
-#     from app.agent.tools import WebSearchTool
-#     from app.agent.tools import WebScraperTool
-#
-#     agent = (
-#         AgentBuilder()
-#         .with_tools([WebSearchTool(), WebScraperTool()])
-#         .with_max_iterations(15)  # больше итераций для исследований
-#         .build()
-#     )
-#
-#     return AgentExecutor(agent)
-#
+    Returns:
+        Готовый к использованию AgentExecutor
+    """
+    global _room_agent_executor
 
-# Вспомогательные функции
+    if _room_agent_executor is None:
+        _room_agent_executor = build_room_agent(checkpointer)
+
+    return _room_agent_executor
+
 
 async def quick_ask(question: str) -> str:
     """

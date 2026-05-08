@@ -46,25 +46,46 @@ class Settings(BaseSettings):
     # DATABASE API
     database_api_url: str | None = None
 
-    # DATABASE CHECKPOINTER
-    langgraph_db_name: str = "postgres"
-    langgraph_db_user: str = "postgres"
-    langgraph_db_password: str = ""
-    langgraph_db_host: str = "localhost"
-    langgraph_db_port_internal: int = 5432
-    langgraph_db_port_external: int = 5431
+    # DATABASE RECEIPT CHECKPOINTER
+    langgraph_receipt_db_name: str = "postgres"
+    langgraph_receipt_db_user: str = "postgres"
+    langgraph_receipt_db_password: str = ""
+    langgraph_receipt_db_host: str = "localhost"
+    langgraph_receipt_db_port_internal: int = 5432
+    langgraph_receipt_db_port_external: int = 5431
+
+    # DATABASE ROOM CHECKPOINTER
+    langgraph_room_db_name: str = "postgres"
+    langgraph_room_db_user: str = "postgres"
+    langgraph_room_db_password: str = ""
+    langgraph_room_db_host: str = "localhost"
+    langgraph_room_db_port_internal: int = 5434
+    langgraph_room_db_port_external: int = 5434
 
     @computed_field
     @property
-    def langgraph_db_url(self) -> str:
+    def langgraph_receipt_db_url(self) -> str:
         # экранирование пароля
-        pwd = quote_plus(self.langgraph_db_password) if self.langgraph_db_password else ""
+        pwd = quote_plus(self.langgraph_receipt_db_password) if self.langgraph_receipt_db_password else ""
 
         return (
             f"postgresql://"
-            f"{self.langgraph_db_user}:{pwd}"
-            f"@{self.langgraph_db_host}:{self.langgraph_db_port_internal}"
-            f"/{self.langgraph_db_name}"
+            f"{self.langgraph_receipt_db_user}:{pwd}"
+            f"@{self.langgraph_receipt_db_host}:{self.langgraph_receipt_db_port_internal}"
+            f"/{self.langgraph_receipt_db_name}"
+        )
+
+    @computed_field
+    @property
+    def langgraph_room_db_url(self) -> str:
+        # экранирование пароля
+        pwd = quote_plus(self.langgraph_room_db_password) if self.langgraph_room_db_password else ""
+
+        return (
+            f"postgresql://"
+            f"{self.langgraph_room_db_user}:{pwd}"
+            f"@{self.langgraph_room_db_host}:{self.langgraph_room_db_port_internal}"
+            f"/{self.langgraph_room_db_name}"
         )
 
 
@@ -75,6 +96,16 @@ class Settings(BaseSettings):
     # TOOLS
     db_query_max_rows: int = 100
     db_query_timeout: int = 30
+
+    # ASR SERVICE
+    asr_service_host: str = "localhost"
+    asr_service_port: int = 5030
+    asr_timeout_seconds: int = 10
+    
+    @computed_field
+    @property
+    def asr_service_url(self) -> str:
+        return f"http://{self.asr_service_host}:{self.asr_service_port}"
 
     # External API tools
     external_api_enabled: bool = True
@@ -88,6 +119,19 @@ class Settings(BaseSettings):
         case_sensitive=False,  # DATABASE_URL == database_url
         extra="ignore",  # Игнорировать неизвестные переменные
     )
+    
+    def __init__(self, **data):
+        super().__init__(**data)
+        print("\n=== CONFIG LOADED VALUES ===")
+        print(f"Receipt DB Host: {self.langgraph_receipt_db_host}")
+        print(f"Receipt DB Port Internal: {self.langgraph_receipt_db_port_internal}")
+        print(f"Receipt DB Name: {self.langgraph_receipt_db_name}")
+        print(f"Receipt DB URL: {self.langgraph_receipt_db_url}")
+        print(f"\nRoom DB Host: {self.langgraph_room_db_host}")
+        print(f"Room DB Port Internal: {self.langgraph_room_db_port_internal}")
+        print(f"Room DB Name: {self.langgraph_room_db_name}")
+        print(f"Room DB URL: {self.langgraph_room_db_url}")
+        print("=== END CONFIG ===\n")
 
 
 # Singleton pattern для settings

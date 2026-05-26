@@ -16,6 +16,55 @@ export interface RoomParticipant {
   selected: Record<string, number>; // item_id: quantity_selected
 }
 
+export interface SplitParticipant {
+  id: string;
+  name: string;
+  color: string;
+}
+
+export type ItemSplits = Record<string, Record<string, number>>;
+export type SplitMode = 'even' | 'items' | 'mixed';
+export type ItemCategory = 'food' | 'drink' | 'alcohol' | 'delivery' | 'packaging' | 'discount' | 'other';
+
+export interface SplitProposal {
+  id: string;
+  type: 'split_all_evenly' | 'split_item_evenly' | 'claim_item';
+  itemId?: string;
+  fromParticipantId: string;
+  targetParticipantId?: string;
+  participantIds: string[];
+  acceptedBy: string[];
+  declinedBy: string[];
+  status: 'open' | 'accepted' | 'declined';
+  createdAt: string | null;
+}
+
+export interface RoomLiveState {
+  roomId: string;
+  version: number;
+  participants: SplitParticipant[];
+  creatorParticipantId: string;
+  splitMode: SplitMode;
+  items: Array<{
+    id: string;
+    name: string;
+    price: number;
+    quantity: number;
+  }>;
+  itemSplits: ItemSplits;
+  proposals: SplitProposal[];
+  updatedAt: string | null;
+}
+
+export interface ItemIntelligence {
+  id: string;
+  category: ItemCategory;
+  category_confidence: number;
+  suggest_for_participant: boolean;
+  suggestion_confidence: number;
+  matched_history_item: string | null;
+}
+
 export interface ReceiptItem {
   id: string;
   name: string;
@@ -27,6 +76,7 @@ export interface ReceiptItem {
 export interface Receipt {
   id: string;
   paidAt: string;
+  placeName?: string | null;
   tip: number;
   service: number;
   items: ReceiptItem[];

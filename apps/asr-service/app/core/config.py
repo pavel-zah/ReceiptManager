@@ -25,7 +25,14 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
     
     # CORS
-    cors_origins: list[str] = ["http://localhost:8000", "http://localhost:3000"]
+    cors_origins: list[str] = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:4173",
+        "http://127.0.0.1:4173",
+        "http://localhost:8000",
+        "http://localhost:3000",
+    ]
     cors_allow_credentials: bool = True
     cors_allow_methods: list[str] = ["*"]
     cors_allow_headers: list[str] = ["*"]
@@ -33,7 +40,8 @@ class Settings(BaseSettings):
     # OPENROUTER ASR
     openrouter_api_key: str | None = None
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
-    asr_model: str = "mistralai/voxtral-small-24b-2507"  # OpenRouter model for audio transcription
+    asr_model: str = "mistralai/voxtral-mini-transcribe"
+    asr_fallback_models: str = "qwen/qwen3-asr-flash-2026-02-10,openai/gpt-4o-mini-transcribe,openai/whisper-large-v3"
     asr_temperature: float = 0.0
     asr_timeout: int = 30  # seconds
     

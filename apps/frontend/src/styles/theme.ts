@@ -7,28 +7,35 @@ export const createGlobalStyles = (): React.CSSProperties => ({
 });
 
 export const colors = {
-  primary: '#FF7A3D',
-  primaryDark: '#E85A1A',
-  success: '#6ECFB0',
-  error: '#E86B6B',
-  warning: '#F0C96A',
-  background: '#FFFAF6',
-  secondaryBg: '#FFF3EB',
-  text: '#2D1F14',
-  textSecondary: '#9C7B66',
-  border: '#F5DDD0',
-  divider: '#FAE8DC',
-  shadow: 'rgba(200, 100, 50, 0.10)',
+  primary: 'var(--app-primary, #2F80ED)',
+  primaryDark: 'var(--app-primary-dark, #1764C7)',
+  accent: '#FFB020',
+  accentSoft: '#FFF3D6',
+  success: '#19A974',
+  successSoft: '#E4F8EF',
+  error: '#E5484D',
+  errorSoft: '#FFECEF',
+  warning: '#F5A524',
+  warningSoft: '#FFF4D8',
+  background: 'var(--app-bg, #F4F7FB)',
+  surface: 'var(--app-surface, #FFFFFF)',
+  surfaceAlt: 'var(--app-surface-alt, #EAF1FB)',
+  secondaryBg: 'var(--app-secondary-bg, #EEF5FF)',
+  text: 'var(--app-text, #17212B)',
+  textSecondary: 'var(--app-text-secondary, #617082)',
+  muted: 'var(--app-muted, #8A97A8)',
+  border: 'var(--app-border, #DCE6F2)',
+  divider: 'var(--app-divider, #E7EEF7)',
+  shadow: 'rgba(20, 36, 58, 0.12)',
 
-  // Bento pastel palette (warm orange/peach tones)
-  pastelPink:    '#FFE8E0',
-  pastelMint:    '#FFF0E6',
-  pastelLavender:'#FFE9D9',
-  pastelPeach:   '#FFEADE',
-  pastelBlue:    '#FFE4D4',
-  pastelYellow:  '#FFF4E0',
-  pastelCoral:   '#FFD9C8',
-  pastelSage:    '#FAEEE4',
+  pastelPink: '#FFECEF',
+  pastelMint: '#E4F8EF',
+  pastelLavender: '#F0ECFF',
+  pastelPeach: '#FFF1E8',
+  pastelBlue: '#E7F0FF',
+  pastelYellow: '#FFF4D8',
+  pastelCoral: '#FFE5DF',
+  pastelSage: '#EAF7F1',
 };
 
 export const spacing = {
@@ -42,19 +49,22 @@ export const spacing = {
 
 export const typography = {
   title: {
-    fontSize: '24px',
-    fontWeight: 600,
-    lineHeight: '1.4',
+    fontSize: '28px',
+    fontWeight: 800,
+    lineHeight: '1.12',
+    letterSpacing: 0,
   },
   heading: {
-    fontSize: '18px',
-    fontWeight: 600,
-    lineHeight: '1.3',
+    fontSize: '20px',
+    fontWeight: 750,
+    lineHeight: '1.2',
+    letterSpacing: 0,
   },
   subtitle: {
     fontSize: '16px',
-    fontWeight: 500,
+    fontWeight: 700,
     lineHeight: '1.3',
+    letterSpacing: 0,
   },
   body: {
     fontSize: '15px',
@@ -76,10 +86,10 @@ export const typography = {
 
 export const borderRadius = {
   xs: '6px',
-  sm: '12px',
-  md: '16px',
-  lg: '22px',
-  xl: '28px',
+  sm: '8px',
+  md: '12px',
+  lg: '16px',
+  xl: '22px',
 };
 
 export const globalStyles = `

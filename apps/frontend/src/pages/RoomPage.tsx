@@ -1,13 +1,18 @@
 ﻿import React, { useState, useRef, useCallback } from 'react';
-import { colors, spacing, typography, borderRadius } from '@/styles/theme';
+import { colors, spacing, typography } from '@/styles/theme';
 import {
+  PageContainer,
+  PageContent,
+  PageFooter,
   Header,
   ErrorAlert,
+  Card,
+  Button,
+  Pill,
 } from '@/components/UI';
 import { useAppStore } from '@/hooks/useAppStore';
 import { hapticFeedback } from '@/utils/telegram';
-
-const ASR_URL = 'http://localhost:8000/api/asr/transcribe';
+import { asrAPI } from '@/utils/api';
 
 type RecordingState = 'idle' | 'recording' | 'uploading';
 
@@ -31,13 +36,18 @@ export const RoomPage: React.FC = () => {
       setTranscription(null);
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-      const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+      const preferredMimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
         ? 'audio/webm;codecs=opus'
         : MediaRecorder.isTypeSupported('audio/webm')
         ? 'audio/webm'
-        : 'audio/ogg';
+        : MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
+        ? 'audio/ogg;codecs=opus'
+        : '';
 
-      const recorder = new MediaRecorder(stream, { mimeType });
+      const recorder = preferredMimeType
+        ? new MediaRecorder(stream, { mimeType: preferredMimeType })
+        : new MediaRecorder(stream);
+      const mimeType = recorder.mimeType || preferredMimeType || 'audio/webm';
       chunksRef.current = [];
 
       recorder.ondataavailable = (e) => {
@@ -92,23 +102,11 @@ export const RoomPage: React.FC = () => {
   const sendToASR = async (blob: Blob, mimeType: string) => {
     try {
       const ext = mimeType.includes('ogg') ? 'ogg' : 'webm';
-      const formData = new FormData();
-      formData.append('file', blob, `recording.${ext}`);
 
       console.log('[ASR] Отправка аудио на сервер...', { size: blob.size, type: mimeType });
 
-      const response = await fetch(ASR_URL, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-
-      const result = await response.json();
-      console.log('[ASR] Результат:', result);
-
-      const text: string =
-        result?.text ?? result?.transcription ?? result?.result ?? JSON.stringify(result);
+      const text = await asrAPI.transcribe(blob, `recording.${ext}`);
+      console.log('[ASR] Результат:', text);
       setTranscription(text);
       setTextInput((prev) => (prev ? prev + ' ' + text : text));
       hapticFeedback('success');
@@ -132,63 +130,38 @@ export const RoomPage: React.FC = () => {
   const isUploading = recordingState === 'uploading';
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', backgroundColor: colors.background }}>
-      <Header title="Комната" onBack={() => setCurrentPage('home')} />
+    <PageContainer>
+      <Header title="Комната" subtitle="Голосом или вручную" onBack={() => setCurrentPage('home')} rightAction={<Pill tone="blue">{roomCode}</Pill>} />
 
-      {/* Scrollable content */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: spacing.lg, display: 'flex', flexDirection: 'column', gap: spacing.md }}>
+      <PageContent>
         {error && <ErrorAlert message={error} onDismiss={() => setError(null)} />}
 
-        {/* Room code */}
         <div
           style={{
-            background: `linear-gradient(135deg, ${colors.primary} 0%, ${colors.primaryDark} 100%)`,
-            borderRadius: borderRadius.lg,
-            padding: spacing.lg,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
+            background: `linear-gradient(145deg, ${colors.primaryDark}, ${colors.text})`,
+            borderRadius: 28,
+            padding: 22,
+            color: '#fff',
+            boxShadow: '0 22px 46px rgba(23,33,43,0.2)',
           }}
         >
-          <div>
-            <div style={{ ...typography.bodySmall, color: 'rgba(255,255,255,0.75)', marginBottom: 4 }}>
-              Код комнаты
-            </div>
-            <div style={{ fontFamily: 'monospace', fontSize: '28px', fontWeight: 700, letterSpacing: '0.14em', color: '#ffffff' }}>
-              {roomCode}
-            </div>
+          <Pill tone="dark" style={{ background: 'rgba(255,255,255,0.14)', color: '#fff' }}>voice split</Pill>
+          <div style={{ ...typography.title, color: '#fff', marginTop: 18 }}>
+            Скажите, что было вашим
           </div>
-          <div style={{ fontSize: '36px' }}>🔒</div>
+          <div style={{ ...typography.body, color: 'rgba(255,255,255,0.72)', marginTop: 8 }}>
+            Например: “кофе мне, пакет пополам”. Или выберите позиции вручную.
+          </div>
         </div>
 
-        {/* Transcription result hint */}
         {transcription && (
-          <div
-            style={{
-              backgroundColor: colors.pastelPeach,
-              borderRadius: borderRadius.md,
-              padding: `${spacing.sm}px ${spacing.md}px`,
-              ...typography.bodySmall,
-              color: colors.textSecondary,
-              fontStyle: 'italic',
-            }}
-          >
+          <Card>
             🎙 Распознано: «{transcription}»
-          </div>
+          </Card>
         )}
 
-        {/* Recording indicator */}
         {isRecording && (
-          <div
-            style={{
-              backgroundColor: '#FFE4E0',
-              borderRadius: borderRadius.md,
-              padding: `${spacing.sm}px ${spacing.md}px`,
-              display: 'flex',
-              alignItems: 'center',
-              gap: spacing.sm,
-            }}
-          >
+          <Card style={{ background: colors.errorSoft, borderColor: 'rgba(229,72,77,0.18)', display: 'flex', alignItems: 'center', gap: spacing.sm }}>
             <div
               style={{
                 width: 10,
@@ -202,36 +175,19 @@ export const RoomPage: React.FC = () => {
             <span style={{ ...typography.body, color: colors.error, fontWeight: 600 }}>
               Запись {formatTime(recordingSeconds)}
             </span>
-          </div>
+          </Card>
         )}
 
         {isUploading && (
-          <div
-            style={{
-              backgroundColor: colors.pastelYellow,
-              borderRadius: borderRadius.md,
-              padding: `${spacing.sm}px ${spacing.md}px`,
-              ...typography.body,
-              color: colors.textSecondary,
-            }}
-          >
+          <Card style={{ background: colors.warningSoft }}>
             ⏳ Распознаём речь...
-          </div>
+          </Card>
         )}
 
-        {/* Manual selection */}
-        <div
-          style={{
-            backgroundColor: colors.secondaryBg,
-            borderRadius: borderRadius.lg,
-            padding: spacing.lg,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            cursor: 'pointer',
-            border: `1px solid ${colors.divider}`,
-          }}
+        <Card
+          interactive
           onClick={() => setCurrentPage('select-items')}
+          style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: spacing.md }}
         >
           <div>
             <div style={{ ...typography.subtitle, color: colors.text, marginBottom: 4 }}>
@@ -242,21 +198,11 @@ export const RoomPage: React.FC = () => {
             </div>
           </div>
           <div style={{ fontSize: '22px', color: colors.primary }}>→</div>
-        </div>
-      </div>
+        </Card>
+      </PageContent>
 
-      {/* Bottom chat bar */}
-      <div
-        style={{
-          padding: `${spacing.sm}px ${spacing.md}px`,
-          backgroundColor: '#ffffff',
-          borderTop: `1px solid ${colors.divider}`,
-          display: 'flex',
-          alignItems: 'center',
-          gap: spacing.sm,
-          paddingBottom: `max(${spacing.md}px, env(safe-area-inset-bottom))`,
-        }}
-      >
+      <PageFooter>
+        <div style={{ display: 'flex', alignItems: 'center', gap: spacing.sm }}>
         <input
           ref={inputRef}
           type="text"
@@ -281,20 +227,9 @@ export const RoomPage: React.FC = () => {
 
         {/* Send button — shown only when text is ready */}
         {textInput.trim() && !isRecording && !isUploading && (
-          <button
-            onClick={handleSendText}
-            style={{
-              width: '42px', height: '42px', borderRadius: '50%',
-              border: 'none', outline: 'none', cursor: 'pointer',
-              backgroundColor: colors.primary, color: '#fff',
-              fontSize: '18px', display: 'flex', alignItems: 'center',
-              justifyContent: 'center', flexShrink: 0,
-              boxShadow: `0 2px 8px ${colors.shadow}`,
-            }}
-            aria-label="Отправить"
-          >
+          <Button onClick={handleSendText} aria-label="Отправить" style={{ width: 42, height: 42, minHeight: 42, padding: 0, borderRadius: '50%', flexShrink: 0 }}>
             →
-          </button>
+          </Button>
         )}
 
         {/* Mic button */}
@@ -316,7 +251,8 @@ export const RoomPage: React.FC = () => {
         >
           {isUploading ? '⏳' : isRecording ? '⏹' : '🎙'}
         </button>
-      </div>
-    </div>
+        </div>
+      </PageFooter>
+    </PageContainer>
   );
 };

@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { colors } from '@/styles/theme';
 import { useAppStore } from '@/hooks/useAppStore';
-import { initTelegramApp, getTelegramUser } from '@/utils/telegram';
+import { initTelegramApp, getTelegramUser, applyTelegramTheme } from '@/utils/telegram';
 import { HomePage } from '@/pages/HomePage';
 import { JoinRoomPage } from '@/pages/JoinRoomPage';
 import { SelectItemsPage } from '@/pages/SelectItemsPage';
@@ -15,10 +15,8 @@ export const APP: React.FC = () => {
   useEffect(() => {
     // Initialize Telegram Web App
     const tgApp = initTelegramApp();
+    applyTelegramTheme();
     if (tgApp) {
-      tgApp.setBackgroundColor('FFFAF6');
-      tgApp.setHeaderColor('FFFAF6');
-
       const user = getTelegramUser();
       if (user) {
         setTelegramUser(user);
@@ -30,6 +28,31 @@ export const APP: React.FC = () => {
     style.textContent = `
       @keyframes spin {
         to { transform: rotate(360deg); }
+      }
+      @keyframes riseIn {
+        from { opacity: 0; transform: translateY(14px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes scanLine {
+        0% { transform: translateY(-36px); opacity: 0; }
+        15% { opacity: 1; }
+        100% { transform: translateY(152px); opacity: 0; }
+      }
+      @keyframes shimmer {
+        100% { transform: translateX(100%); }
+      }
+      @keyframes pop {
+        0% { transform: scale(0.96); opacity: 0; }
+        100% { transform: scale(1); opacity: 1; }
+      }
+      @keyframes shineSweep {
+        0%, 58% { transform: translateX(0) skewX(-18deg); opacity: 0; }
+        68% { opacity: 1; }
+        100% { transform: translateX(420%) skewX(-18deg); opacity: 0; }
+      }
+      @keyframes confettiDrift {
+        0%, 100% { transform: translateY(0) rotate(0deg); opacity: 0.2; }
+        50% { transform: translateY(8px) rotate(18deg); opacity: 0.46; }
       }
 
       * {
@@ -47,8 +70,9 @@ export const APP: React.FC = () => {
       }
 
       body {
-        background-color: #FFFAF6;
-        color: #2D1F14;
+        background-color: var(--app-bg, #F4F7FB);
+        color: var(--app-text, #17212B);
+        overscroll-behavior: none;
       }
 
       button, input, textarea, select {
@@ -58,6 +82,7 @@ export const APP: React.FC = () => {
       button {
         border: none;
         outline: none;
+        -webkit-tap-highlight-color: transparent;
       }
 
       button:focus, button:focus-visible {
@@ -70,7 +95,11 @@ export const APP: React.FC = () => {
       }
 
       ::placeholder {
-        color: #99a2ad;
+        color: #8A97A8;
+      }
+
+      .safe-bottom {
+        padding-bottom: max(16px, env(safe-area-inset-bottom));
       }
 
       ::-webkit-scrollbar {

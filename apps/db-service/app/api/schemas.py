@@ -182,8 +182,8 @@ class ReceiptItemCreate(BaseModel):
     @field_validator('price', 'quantity')
     @classmethod
     def validate_positive(cls, v: Decimal) -> Decimal:
-        if v <= 0:
-            raise ValueError("Must be positive")
+        if v < 0:
+            raise ValueError("Must be non-negative")
         return v
 
 
@@ -195,8 +195,8 @@ class ReceiptItemUpdate(BaseModel):
     @field_validator('price', 'quantity')
     @classmethod
     def validate_positive(cls, v: Decimal | None) -> Decimal | None:
-        if v is not None and v <= 0:
-            raise ValueError("Must be positive")
+        if v is not None and v < 0:
+            raise ValueError("Must be non-negative")
         return v
 
 
